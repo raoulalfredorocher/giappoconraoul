@@ -324,9 +324,10 @@ function renderStudy(app){
       ${mk==='rec'?`<div class="lvlbar" aria-hidden="true"><div id="lvl"></div></div><div class="heard" id="mic-status" aria-live="polite">${SQ.listening?esc(REC.status||'Parla ora'):heard?'Ho sentito: «'+esc(heard)+'»':'Tocca il microfono e parla'}</div>
         <div class="muted small" id="model-status">${REC.model==='ready'?'Modello vocale pronto':REC.model==='loading'?'Modello vocale: scarico '+REC.pct+'% (solo la prima volta)':REC.model==='error'?'Modello vocale non caricato: '+esc(REC.modelErr||''):''}</div>`
       :`<div class="heard" aria-live="polite">${SQ.listening?(SQ.partial?esc(SQ.partial):'Ti ascolto…'):heard?'Ho sentito: «'+esc(heard)+'»':''}</div>`}`:''}
+    ${SQ.fail&&SQ.fail.step===step?`<div class="fb bad" style="margin:12px 0"><div>Ho capito «${esc(SQ.fail.heard)}», ma non coincide.${step==='read'?` Si legge <b>${esc(w?w.ro:RO[it])}</b>.`:` Il significato è <b>${esc(w?w.it:'')}</b>.`}</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-fail="retry">Riprova</button><button class="btn" data-fail="ok">Era giusto</button><button class="btn primary" data-fail="go">Continua</button></div></div>`:''}
     ${SQ.confirm&&SQ.confirm.step===step?`<div class="fb info" style="margin:12px 0"><div>Ho sentito «${esc(SQ.confirm.heard)}».${step==='read'?` Si legge <b>${esc(w?w.ro:RO[it])}</b>.`:` Il significato è <b>${esc(w?w.it:'')}</b>.`}</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-conf="no">Sbagliato</button><button class="btn primary" data-conf="ok">Era giusto</button></div></div>`:''}
     <form class="row" id="f-type" style="justify-content:center;flex-wrap:nowrap"><input id="i-type" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${step==='read'?'es. aki':'es. autunno'}" value="${esc(SQ.typed)}"><button class="btn primary" type="submit">Verifica</button></form>
-    <div style="margin-top:10px"><button class="btn" id="b-show">${SQ.anyAnswer?'Non lo so':'Mostra'}</button></div>
+    <div class="row" style="margin-top:10px;justify-content:center"><button class="btn" id="b-show">${SQ.anyAnswer?'Non lo so':'Mostra'}</button><button class="btn" id="b-skip2">Salta</button></div>
     ${SQ.msg?`<div class="fb ${SQ.msg.t}" style="margin-top:12px">${esc(SQ.msg.x)}</div>`:''}
     ${mk==='rec'?`<details class="diagbox"><summary>Diagnostica microfono</summary><pre id="diag">${esc(Object.entries(REC.diag||{}).map(([k,x])=>k+': '+x).join('\n')||'Nessun tentativo ancora.')}</pre></details>`:''}
   </div>`:`<div class="ask">${SQ.self?`<div class="muted small">L'avevi detto giusto?</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-self="no">No, da ripassare</button><button class="btn primary" data-self="ok">Sì, giusto</button></div>`
@@ -335,6 +336,7 @@ function renderStudy(app){
   </div>`;
   $('#b-back').onclick=()=>{micStop();if(SQ.n)toast(`${SQ.ok} giuste su ${SQ.n}.`);go('home');};
   $('#b-skip').onclick=()=>{micStop();loadStudy(nextStudy());render();};
+  const sk2=$('#b-skip2');if(sk2)sk2.onclick=()=>{micStop();loadStudy(nextStudy());render();};
   const sy=$('#b-say');if(sy)sy.onclick=()=>speak(it);
   const nx=$('#b-next');if(nx)nx.onclick=()=>{loadStudy(nextStudy());render();};
   const fx=$('#b-fix');if(fx)fx.onclick=()=>{SQ.res.read='ok';if(w)SQ.res.mean='ok';studyRecord();render();};
@@ -348,6 +350,9 @@ function renderStudy(app){
     SQ.res[step]='no';
     if(step==='read'&&w){SQ.step='mean';speak(it);SQ.msg={t:'bad',x:`Si legge ${w.ro}. Ascoltala e ripetila.`};render();return;}
     SQ.step='done';if(step==='read')speak(it);studyRecord();render();};
+  app.querySelectorAll('[data-fail]').forEach(b=>b.onclick=()=>{const f=SQ.fail;if(!f)return;const k=b.dataset.fail;
+    if(k==='retry'){SQ.fail=null;SQ.msg=null;SQ.typed='';render();return;}
+    SQ.force=true;studyResolve(f.step,k==='ok'?'ok':'no',f.note,false,f.heard);});
   app.querySelectorAll('[data-conf]').forEach(b=>b.onclick=()=>{const c=SQ.confirm;if(!c)return;studyResolve(c.step,b.dataset.conf,'',false,c.heard);});
   if(micKind(lang)==='rec'&&REC.model==='idle')loadASR().catch(()=>{});
   const mb=$('#b-mic');if(mb)mb.onclick=()=>{
@@ -378,8 +383,10 @@ async function studyAnswer(texts,typed){
 }
 function studyResolve(step,v,note,typed,heard){
   const it=SQ.item,w=SQ.w;SQ.confirm=null;
+  if(v==='no'&&heard&&!SQ.force){SQ.fail={step,heard,note};SQ.msg=null;SQ.listening=false;render();return;}
+  SQ.force=false;SQ.fail=null;
   SQ.res[step]=v;SQ.msg=null;SQ.note=note;
-  if(step==='read'){speak(it);if(w){SQ.step='mean';SQ.msg=v==='ok'?{t:'ok',x:`Giusto: ${w.ro}.`}:{t:'bad',x:`Si legge ${w.ro}${typed?'':` (ho sentito «${heard}»)`}. Ascoltala e ripetila.`};render();return;}}
+  if(step==='read'){setTimeout(()=>speak(it),250);if(w){SQ.step='mean';SQ.msg=v==='ok'?{t:'ok',x:`Giusto: ${w.ro}.`}:{t:'bad',x:`Si legge ${w.ro}${typed?'':` (ho sentito «${heard}»)`}. Ascoltala e ripetila.`};render();return;}}
   SQ.step='done';studyRecord();render();
 }
 
