@@ -8,4 +8,4 @@ self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;c
   if(u.origin!==location.origin&&!lib)return;
   e.respondWith((async()=>{const c=await caches.open(V);
     if(lib){const hit=await c.match(r);if(hit)return hit;const res=await fetch(r);if(res.ok||res.type==='opaque')c.put(r,res.clone());return res;}
-    try{const res=await fetch(r);if(res.ok)c.put(r,res.clone());return res;}catch(x){return (await c.match(r,{ignoreSearch:true}))||(await c.match('index.html'))||Response.error();}})());});
+    try{const res=await fetch(r,{cache:'no-cache'});if(res.ok)c.put(r,res.clone());return res;}catch(x){return (await c.match(r,{ignoreSearch:true}))||(await c.match('index.html'))||Response.error();}})());});
