@@ -407,15 +407,7 @@ function speak(text){
 }
 function speakSys(text){
   if(!('speechSynthesis' in window)){toast('Questo browser non ha la sintesi vocale.');return;}
-  const say=()=>{try{
-    const u=new SpeechSynthesisUtterance(SPEAK_FIX[text]||text);u.lang='ja-JP';if(jaVoice)u.voice=jaVoice;u.rate=S.settings.rate;u.volume=1;
-    u.onerror=e=>{speak.lastErr=e&&e.error;};
-    window.__utt=u; // keep a reference: iOS may drop utterances that get garbage collected
-    speechSynthesis.resume();speechSynthesis.speak(u);
-  }catch(e){speak.lastErr=String(e);}};
-  try{
-    if(!jaVoice)loadVoices();
-    if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(say,120);}else say();
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(SPEAK_FIX[text]||text);u.lang='ja-JP';if(jaVoice)u.voice=jaVoice;u.rate=S.settings.rate;speechSynthesis.speak(u);
     if(!jaVoice&&!speak.warned){speak.warned=true;setTimeout(()=>{loadVoices();if(!jaVoice)toast('Voce giapponese non trovata: vedi Impostazioni.');},800);}
   }catch(e){}
 }
@@ -448,31 +440,22 @@ function recStatus(t){REC.status=t;const el=document.getElementById('mic-status'
 function recLevel(v){REC.level=v;const el=document.getElementById('lvl');if(el)el.style.width=Math.round(Math.min(1,v)*100)+'%';}
 function recDiag(){const D=REC.diag,el=document.getElementById('diag');if(!el)return;
   el.textContent=Object.entries(D).map(([k,v])=>k+': '+v).join('\n');}
-let ASR=null,asrP=null,asrW=null,asrId=0;const asrWait={};
-function asrWorker(){
-  if(asrW)return asrW;
-  asrW=new Worker(new URL('vendor/asr-worker.js',document.baseURI).href,{type:'module'});
-  asrW.onmessage=e=>{const m=e.data;
-    if(m.type==='progress'){REC.pct=m.pct;const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale: scarico '+m.pct+'% (solo la prima volta)';}
-    else if(m.type==='ready'){ASR=true;REC.model='ready';const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale pronto';if(asrWait.load){asrWait.load.ok(true);delete asrWait.load;}}
-    else if(m.type==='result'||m.type==='error'){const w=asrWait[m.id];if(w){delete asrWait[m.id];m.type==='result'?w.ok(m.text):w.err(new Error(m.message));}
-      else if(m.type==='error'&&asrWait.load){asrWait.load.err(new Error(m.message));delete asrWait.load;}}};
-  asrW.onerror=ev=>{const msg=(ev&&ev.message)||'worker';REC.model='error';REC.modelErr=msg;asrP=null;asrW=null;
-    for(const k in asrWait){asrWait[k].err(new Error(msg));delete asrWait[k];}
-    const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale non caricato: '+msg;};
-  return asrW;
-}
+let ASR=null,asrP=null;const asrFiles={};
 function loadASR(){
-  if(ASR)return Promise.resolve(true);if(asrP)return asrP;
+  if(ASR)return Promise.resolve(ASR);if(asrP)return asrP;
   REC.model='loading';
-  asrP=new Promise((ok,err)=>{asrWait.load={ok,err};asrWorker().postMessage({type:'load'});});
+  asrP=(async()=>{
+    const T=await import(new URL('vendor/transformers.min.js',document.baseURI).href);
+    T.env.allowLocalModels=false;T.env.useBrowserCache=true;
+    T.env.backends.onnx.wasm.wasmPaths=new URL('vendor/',document.baseURI).href;
+    T.env.backends.onnx.wasm.numThreads=1;
+    const a=await T.pipeline('automatic-speech-recognition','Xenova/whisper-base',{progress_callback:p=>{
+      if(p&&p.file&&p.total){asrFiles[p.file]={l:p.loaded||0,t:p.total};let l=0,t=0;for(const f in asrFiles){l+=asrFiles[f].l;t+=asrFiles[f].t;}REC.pct=t?Math.round(100*l/t):0;
+        const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale: scarico '+REC.pct+'% (solo la prima volta)';}}});
+    ASR=a;REC.model='ready';const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale pronto';return a;
+  })();
   asrP.catch(e=>{REC.model='error';REC.modelErr=(e&&e.message)||String(e);asrP=null;const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale non caricato: '+REC.modelErr;});
   return asrP;
-}
-function asrRun(pcm,lang){
-  return loadASR().then(()=>new Promise((ok,err)=>{const id=++asrId;asrWait[id]={ok,err};
-    setTimeout(()=>{if(asrWait[id]){delete asrWait[id];err(new Error('tempo scaduto (40 s)'));}},40000);
-    asrW.postMessage({type:'run',id,pcm,lang:lang==='ja'?'japanese':'italian'},[pcm.buffer]);}));
 }
 function resample(f32,from,to){if(from===to)return f32;const r=from/to,n=Math.floor(f32.length/r),o=new Float32Array(n);
   for(let i=0;i<n;i++){const a=Math.floor(i*r),b=Math.min(f32.length,Math.floor((i+1)*r));let s=0;for(let j=a;j<b;j++)s+=f32[j];o[i]=s/Math.max(1,b-a);}return o;}
@@ -498,31 +481,28 @@ function recListen(lang,onPartial,onDone,onFail){
       if(!speech){fail('silence','picco '+rmsMax.toFixed(3));return;}
       const from=Math.max(0,speechIdx-4),all=new Float32Array(chunks.slice(from).reduce((a,c)=>a+c.length,0));let o=0;for(const c of chunks.slice(from)){all.set(c,o);o+=c.length;}
       const pcm=resample(all,rate,16000);D.campioni=pcm.length;
-      recStatus(ASR?'Elaboro…':'Elaboro… (scarico il modello vocale, solo la prima volta)');const pcmLen=pcm.length;
+      recStatus(ASR?'Elaboro…':'Elaboro… (scarico il modello vocale, solo la prima volta)');
       try{
-        const t1=performance.now();
-        const out={text:await asrRun(pcm,lang)};
+        const a=await loadASR();const t1=performance.now();
+        const out=await a(pcm,{language:lang==='ja'?'japanese':'italian',task:'transcribe'});
         let text=((out&&out.text)||'').trim();D.trascrizione=JSON.stringify(text);D.tempo=((performance.now()-t1)/1000).toFixed(1)+'s';
         if(/^[(（\[].*[)）\]]$/.test(text)||/^[♪♫\s]+$/.test(text)){D.nota='scartata (rumore, non parlato)';text='';}
-        else if(pcmLen<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
+        else if(pcm.length<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
         recDiag();REC.stop=null;
         if(!text){onFail('unclear','');return;}
         onDone([text]);
       }catch(e){fail('asr',(e&&e.message)||String(e));}
     };
     REC.stop=()=>end('stop');
-    D.audioctx=AC.state;
-    setTimeout(()=>{if(!done&&!chunks.length){try{AC.resume();}catch(e){}D.audioctx=AC.state;
-      setTimeout(()=>{if(!done&&!chunks.length){done=true;REC.stop=null;try{stream.getTracks().forEach(t=>t.stop());}catch(e){}try{AC.close();}catch(e){}fail('audio','nessun segnale dal microfono (audio '+AC.state+'). Chiudi e riapri l\u2019app e riprova.');}},1200);}},1500);
     sp.onaudioprocess=e=>{if(done)return;const d=e.inputBuffer.getChannelData(0);chunks.push(new Float32Array(d));
       let sum=0;for(let i=0;i<d.length;i++)sum+=d[i]*d[i];const rms=Math.sqrt(sum/d.length);if(rms>rmsMax)rmsMax=rms;recLevel(rms*7);
       const now=performance.now()-t0;
-      if(now<250){floor=((floor||0)*nf+rms)/(nf+1);nf++;}
+      if(now<400){floor=((floor||0)*nf+rms)/(nf+1);nf++;}
       const thr=Math.max(0.012,(floor||0)*3);
       if(rms>thr){if(!speech){speech=true;speechIdx=chunks.length-1;recStatus('Ti sento…');}lastLoud=now;}
-      if(speech&&now-lastLoud>550)end('silenzio dopo la voce');
-      else if(!speech&&now>5000)end('nessuna voce');
-      else if(now>6000)end('tempo massimo');
+      if(speech&&now-lastLoud>900)end('silenzio dopo la voce');
+      else if(!speech&&now>6000)end('nessuna voce');
+      else if(now>9000)end('tempo massimo');
     };
     recStatus('Parla ora');
   }).catch(err=>{try{AC.close();}catch(e){}fail(err&&err.name==='NotAllowedError'?'not_granted':err&&err.name==='NotFoundError'?'nomic':'audio',(err&&err.name)+': '+(err&&err.message));});

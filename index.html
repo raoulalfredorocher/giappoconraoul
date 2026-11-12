@@ -852,15 +852,7 @@ function speak(text){
 }
 function speakSys(text){
   if(!('speechSynthesis' in window)){toast('Questo browser non ha la sintesi vocale.');return;}
-  const say=()=>{try{
-    const u=new SpeechSynthesisUtterance(SPEAK_FIX[text]||text);u.lang='ja-JP';if(jaVoice)u.voice=jaVoice;u.rate=S.settings.rate;u.volume=1;
-    u.onerror=e=>{speak.lastErr=e&&e.error;};
-    window.__utt=u; // keep a reference: iOS may drop utterances that get garbage collected
-    speechSynthesis.resume();speechSynthesis.speak(u);
-  }catch(e){speak.lastErr=String(e);}};
-  try{
-    if(!jaVoice)loadVoices();
-    if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(say,120);}else say();
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(SPEAK_FIX[text]||text);u.lang='ja-JP';if(jaVoice)u.voice=jaVoice;u.rate=S.settings.rate;speechSynthesis.speak(u);
     if(!jaVoice&&!speak.warned){speak.warned=true;setTimeout(()=>{loadVoices();if(!jaVoice)toast('Voce giapponese non trovata: vedi Impostazioni.');},800);}
   }catch(e){}
 }
@@ -893,31 +885,22 @@ function recStatus(t){REC.status=t;const el=document.getElementById('mic-status'
 function recLevel(v){REC.level=v;const el=document.getElementById('lvl');if(el)el.style.width=Math.round(Math.min(1,v)*100)+'%';}
 function recDiag(){const D=REC.diag,el=document.getElementById('diag');if(!el)return;
   el.textContent=Object.entries(D).map(([k,v])=>k+': '+v).join('\n');}
-let ASR=null,asrP=null,asrW=null,asrId=0;const asrWait={};
-function asrWorker(){
-  if(asrW)return asrW;
-  asrW=new Worker(new URL('vendor/asr-worker.js',document.baseURI).href,{type:'module'});
-  asrW.onmessage=e=>{const m=e.data;
-    if(m.type==='progress'){REC.pct=m.pct;const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale: scarico '+m.pct+'% (solo la prima volta)';}
-    else if(m.type==='ready'){ASR=true;REC.model='ready';const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale pronto';if(asrWait.load){asrWait.load.ok(true);delete asrWait.load;}}
-    else if(m.type==='result'||m.type==='error'){const w=asrWait[m.id];if(w){delete asrWait[m.id];m.type==='result'?w.ok(m.text):w.err(new Error(m.message));}
-      else if(m.type==='error'&&asrWait.load){asrWait.load.err(new Error(m.message));delete asrWait.load;}}};
-  asrW.onerror=ev=>{const msg=(ev&&ev.message)||'worker';REC.model='error';REC.modelErr=msg;asrP=null;asrW=null;
-    for(const k in asrWait){asrWait[k].err(new Error(msg));delete asrWait[k];}
-    const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale non caricato: '+msg;};
-  return asrW;
-}
+let ASR=null,asrP=null;const asrFiles={};
 function loadASR(){
-  if(ASR)return Promise.resolve(true);if(asrP)return asrP;
+  if(ASR)return Promise.resolve(ASR);if(asrP)return asrP;
   REC.model='loading';
-  asrP=new Promise((ok,err)=>{asrWait.load={ok,err};asrWorker().postMessage({type:'load'});});
+  asrP=(async()=>{
+    const T=await import(new URL('vendor/transformers.min.js',document.baseURI).href);
+    T.env.allowLocalModels=false;T.env.useBrowserCache=true;
+    T.env.backends.onnx.wasm.wasmPaths=new URL('vendor/',document.baseURI).href;
+    T.env.backends.onnx.wasm.numThreads=1;
+    const a=await T.pipeline('automatic-speech-recognition','Xenova/whisper-base',{progress_callback:p=>{
+      if(p&&p.file&&p.total){asrFiles[p.file]={l:p.loaded||0,t:p.total};let l=0,t=0;for(const f in asrFiles){l+=asrFiles[f].l;t+=asrFiles[f].t;}REC.pct=t?Math.round(100*l/t):0;
+        const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale: scarico '+REC.pct+'% (solo la prima volta)';}}});
+    ASR=a;REC.model='ready';const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale pronto';return a;
+  })();
   asrP.catch(e=>{REC.model='error';REC.modelErr=(e&&e.message)||String(e);asrP=null;const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale non caricato: '+REC.modelErr;});
   return asrP;
-}
-function asrRun(pcm,lang){
-  return loadASR().then(()=>new Promise((ok,err)=>{const id=++asrId;asrWait[id]={ok,err};
-    setTimeout(()=>{if(asrWait[id]){delete asrWait[id];err(new Error('tempo scaduto (40 s)'));}},40000);
-    asrW.postMessage({type:'run',id,pcm,lang:lang==='ja'?'japanese':'italian'},[pcm.buffer]);}));
 }
 function resample(f32,from,to){if(from===to)return f32;const r=from/to,n=Math.floor(f32.length/r),o=new Float32Array(n);
   for(let i=0;i<n;i++){const a=Math.floor(i*r),b=Math.min(f32.length,Math.floor((i+1)*r));let s=0;for(let j=a;j<b;j++)s+=f32[j];o[i]=s/Math.max(1,b-a);}return o;}
@@ -943,31 +926,28 @@ function recListen(lang,onPartial,onDone,onFail){
       if(!speech){fail('silence','picco '+rmsMax.toFixed(3));return;}
       const from=Math.max(0,speechIdx-4),all=new Float32Array(chunks.slice(from).reduce((a,c)=>a+c.length,0));let o=0;for(const c of chunks.slice(from)){all.set(c,o);o+=c.length;}
       const pcm=resample(all,rate,16000);D.campioni=pcm.length;
-      recStatus(ASR?'Elaboro…':'Elaboro… (scarico il modello vocale, solo la prima volta)');const pcmLen=pcm.length;
+      recStatus(ASR?'Elaboro…':'Elaboro… (scarico il modello vocale, solo la prima volta)');
       try{
-        const t1=performance.now();
-        const out={text:await asrRun(pcm,lang)};
+        const a=await loadASR();const t1=performance.now();
+        const out=await a(pcm,{language:lang==='ja'?'japanese':'italian',task:'transcribe'});
         let text=((out&&out.text)||'').trim();D.trascrizione=JSON.stringify(text);D.tempo=((performance.now()-t1)/1000).toFixed(1)+'s';
         if(/^[(（\[].*[)）\]]$/.test(text)||/^[♪♫\s]+$/.test(text)){D.nota='scartata (rumore, non parlato)';text='';}
-        else if(pcmLen<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
+        else if(pcm.length<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
         recDiag();REC.stop=null;
         if(!text){onFail('unclear','');return;}
         onDone([text]);
       }catch(e){fail('asr',(e&&e.message)||String(e));}
     };
     REC.stop=()=>end('stop');
-    D.audioctx=AC.state;
-    setTimeout(()=>{if(!done&&!chunks.length){try{AC.resume();}catch(e){}D.audioctx=AC.state;
-      setTimeout(()=>{if(!done&&!chunks.length){done=true;REC.stop=null;try{stream.getTracks().forEach(t=>t.stop());}catch(e){}try{AC.close();}catch(e){}fail('audio','nessun segnale dal microfono (audio '+AC.state+'). Chiudi e riapri l\u2019app e riprova.');}},1200);}},1500);
     sp.onaudioprocess=e=>{if(done)return;const d=e.inputBuffer.getChannelData(0);chunks.push(new Float32Array(d));
       let sum=0;for(let i=0;i<d.length;i++)sum+=d[i]*d[i];const rms=Math.sqrt(sum/d.length);if(rms>rmsMax)rmsMax=rms;recLevel(rms*7);
       const now=performance.now()-t0;
-      if(now<250){floor=((floor||0)*nf+rms)/(nf+1);nf++;}
+      if(now<400){floor=((floor||0)*nf+rms)/(nf+1);nf++;}
       const thr=Math.max(0.012,(floor||0)*3);
       if(rms>thr){if(!speech){speech=true;speechIdx=chunks.length-1;recStatus('Ti sento…');}lastLoud=now;}
-      if(speech&&now-lastLoud>550)end('silenzio dopo la voce');
-      else if(!speech&&now>5000)end('nessuna voce');
-      else if(now>6000)end('tempo massimo');
+      if(speech&&now-lastLoud>900)end('silenzio dopo la voce');
+      else if(!speech&&now>6000)end('nessuna voce');
+      else if(now>9000)end('tempo massimo');
     };
     recStatus('Parla ora');
   }).catch(err=>{try{AC.close();}catch(e){}fail(err&&err.name==='NotAllowedError'?'not_granted':err&&err.name==='NotFoundError'?'nomic':'audio',(err&&err.name)+': '+(err&&err.message));});
@@ -1403,7 +1383,7 @@ function renderHome(app){
       <span class="sub">Tutti gli hiragana, con ordine dei tratti e pronuncia</span></span>${IC.next}</button>
   </div>
   <div style="text-align:center;margin-top:14px"><button class="btn" id="b-hist">Storico dei test</button></div>
-  <div class="home-foot"><span style="opacity:.5">v952775dc</span> · Nei test: righe da あ a ${GROUPS[S.unlocked-1].chars[0]}${st?` · serie di ${st} ${st===1?'giorno':'giorni'}`:''}</div>
+  <div class="home-foot">Nei test: righe da あ a ${GROUPS[S.unlocked-1].chars[0]}${st?` · serie di ${st} ${st===1?'giorno':'giorni'}`:''}</div>
   </div>`;
   $('#b-set').onclick=()=>go('settings');
   $('#b-daily').onclick=()=>startQuiz('daily');
@@ -1686,28 +1666,28 @@ function renderStudy(app){
   const ask=step==='read'?(w?'Come si legge questa parola?':'Come si legge questo kana?'):'Cosa significa in italiano?';
   const heard=SQ.heard[step==='done'?'':step];
   app.innerHTML=`<div class="narrow"><div class="topbar"><button class="icon-btn" id="b-back" aria-label="Esci">${IC.close}</button><span class="title">Studio e ascolto</span><span class="spacer"></span>
-    <span class="count">${SQ.ok}/${SQ.n} giuste</span></div>
+    <span class="count">${SQ.ok}/${SQ.n} giuste</span><button class="btn" id="b-skip" style="min-height:40px;padding:0 12px;font-size:.85rem" aria-label="Un'altra">${IC.shuffle}<span class="hide-phone">Un'altra</span></button></div>
   <section class="prompt study"><div class="big">${esc(it)}</div>
     ${step!=='read'?`<div class="row" style="justify-content:center;gap:8px"><span class="ro" style="font-size:1.15rem">${esc(w?w.ro:RO[it])}</span><button class="icon-btn plain" id="b-say" aria-label="Ascolta">${IC.sound}</button>${badge('read')}</div>`:''}
     ${step==='done'?`<div class="row" style="justify-content:center;gap:8px;margin-top:6px"><span style="font-size:1.15rem;font-weight:650">${w?esc(w.it):(KANA_WORD[it]?esc(KANA_WORD[it]):'kana')}</span>${badge('mean')}</div>`:''}
   </section>
-  ${step==='done'&&!SQ.self&&SQ.res.read==='ok'&&(!w||SQ.res.mean==='ok')?'<div class="fb ok" style="margin-top:14px;text-align:center">Giusto!</div>':''}
   ${step!=='done'?`<div class="ask"><b>${ask}</b>
+    <div class="muted small">${mk?(step==='read'?'Tocca il microfono e dillo in giapponese.':'Tocca il microfono e dillo in italiano.')+' Oppure scrivilo.':step==='read'?'Dillo ad alta voce, poi tocca Mostra. Oppure scrivi la lettura in romaji.':'Dillo ad alta voce, poi tocca Mostra. Oppure scrivilo.'}</div>
     ${mk?`<button class="mic ${SQ.listening?'on':''}" id="b-mic" aria-label="${SQ.listening?'Ferma':'Parla'}">${SQ.listening?IC.stop:IC.mic}</button>
       ${mk==='rec'?`<div class="lvlbar" aria-hidden="true"><div id="lvl"></div></div><div class="heard" id="mic-status" aria-live="polite">${SQ.listening?esc(REC.status||'Parla ora'):heard?'Ho sentito: «'+esc(heard)+'»':'Tocca il microfono e parla'}</div>
-        <div class="muted small" id="model-status">${REC.model==='loading'?'Scarico il modello vocale '+REC.pct+'% (solo la prima volta)':REC.model==='error'?'Modello vocale non caricato: '+esc(REC.modelErr||''):''}</div>`
+        <div class="muted small" id="model-status">${REC.model==='ready'?'Modello vocale pronto':REC.model==='loading'?'Modello vocale: scarico '+REC.pct+'% (solo la prima volta)':REC.model==='error'?'Modello vocale non caricato: '+esc(REC.modelErr||''):''}</div>`
       :`<div class="heard" aria-live="polite">${SQ.listening?(SQ.partial?esc(SQ.partial):'Ti ascolto…'):heard?'Ho sentito: «'+esc(heard)+'»':''}</div>`}`:''}
-    ${SQ.fail&&SQ.fail.step===step?`<div class="fb bad" style="margin:12px 0"><div>Ho capito «${esc(SQ.fail.heard)}», ma non coincide.${step==='read'?` Si legge <b>${esc(w?w.ro:RO[it])}</b>.`:` Il significato è <b>${esc(w?w.it:'')}</b>.`}</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-fail="retry">Riprova</button><button class="btn" data-fail="ok">Era giusto</button><button class="btn primary" data-fail="go">Continua</button></div></div>`:''}
     ${SQ.confirm&&SQ.confirm.step===step?`<div class="fb info" style="margin:12px 0"><div>Ho sentito «${esc(SQ.confirm.heard)}».${step==='read'?` Si legge <b>${esc(w?w.ro:RO[it])}</b>.`:` Il significato è <b>${esc(w?w.it:'')}</b>.`}</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-conf="no">Sbagliato</button><button class="btn primary" data-conf="ok">Era giusto</button></div></div>`:''}
     <form class="row" id="f-type" style="justify-content:center;flex-wrap:nowrap"><input id="i-type" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${step==='read'?'es. aki':'es. autunno'}" value="${esc(SQ.typed)}"><button class="btn primary" type="submit">Verifica</button></form>
-    <div class="row" style="margin-top:10px;justify-content:center"><button class="btn" id="b-show">${SQ.anyAnswer?'Non lo so':'Mostra'}</button><button class="btn" id="b-skip2">Salta</button></div>
+    <div style="margin-top:10px"><button class="btn" id="b-show">${SQ.anyAnswer?'Non lo so':'Mostra'}</button></div>
     ${SQ.msg?`<div class="fb ${SQ.msg.t}" style="margin-top:12px">${esc(SQ.msg.x)}</div>`:''}
+    ${mk==='rec'?`<details class="diagbox"><summary>Diagnostica microfono</summary><pre id="diag">${esc(Object.entries(REC.diag||{}).map(([k,x])=>k+': '+x).join('\n')||'Nessun tentativo ancora.')}</pre></details>`:''}
   </div>`:`<div class="ask">${SQ.self?`<div class="muted small">L'avevi detto giusto?</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-self="no">No, da ripassare</button><button class="btn primary" data-self="ok">Sì, giusto</button></div>`
       :`${SQ.note?`<div class="fb info" style="margin-bottom:10px">${esc(SQ.note)}</div>`:''}<div class="row" style="justify-content:center">${SQ.res.read==='no'||SQ.res.mean==='no'?`<button class="btn" id="b-fix">Avevo ragione io</button>`:''}<button class="btn primary" id="b-next">Avanti ${IC.next}</button></div>`}
     ${w?`<button class="linkbtn" id="b-write" style="margin-top:12px">Scrivila a mano</button>`:''}</div>`}
   </div>`;
   $('#b-back').onclick=()=>{micStop();if(SQ.n)toast(`${SQ.ok} giuste su ${SQ.n}.`);go('home');};
-  const sk2=$('#b-skip2');if(sk2)sk2.onclick=()=>{micStop();loadStudy(nextStudy());render();};
+  $('#b-skip').onclick=()=>{micStop();loadStudy(nextStudy());render();};
   const sy=$('#b-say');if(sy)sy.onclick=()=>speak(it);
   const nx=$('#b-next');if(nx)nx.onclick=()=>{loadStudy(nextStudy());render();};
   const fx=$('#b-fix');if(fx)fx.onclick=()=>{SQ.res.read='ok';if(w)SQ.res.mean='ok';studyRecord();render();};
@@ -1721,9 +1701,6 @@ function renderStudy(app){
     SQ.res[step]='no';
     if(step==='read'&&w){SQ.step='mean';speak(it);SQ.msg={t:'bad',x:`Si legge ${w.ro}. Ascoltala e ripetila.`};render();return;}
     SQ.step='done';if(step==='read')speak(it);studyRecord();render();};
-  app.querySelectorAll('[data-fail]').forEach(b=>b.onclick=()=>{const f=SQ.fail;if(!f)return;const k=b.dataset.fail;
-    if(k==='retry'){SQ.fail=null;SQ.msg=null;SQ.typed='';render();return;}
-    SQ.force=true;studyResolve(f.step,k==='ok'?'ok':'no',f.note,false,f.heard);});
   app.querySelectorAll('[data-conf]').forEach(b=>b.onclick=()=>{const c=SQ.confirm;if(!c)return;studyResolve(c.step,b.dataset.conf,'',false,c.heard);});
   if(micKind(lang)==='rec'&&REC.model==='idle')loadASR().catch(()=>{});
   const mb=$('#b-mic');if(mb)mb.onclick=()=>{
@@ -1754,12 +1731,9 @@ async function studyAnswer(texts,typed){
 }
 function studyResolve(step,v,note,typed,heard){
   const it=SQ.item,w=SQ.w;SQ.confirm=null;
-  if(v==='no'&&heard&&!SQ.force){SQ.fail={step,heard,note};SQ.msg=null;SQ.listening=false;render();return;}
-  SQ.force=false;SQ.fail=null;
   SQ.res[step]=v;SQ.msg=null;SQ.note=note;
-  if(step==='read'){setTimeout(()=>speak(it),250);if(w){SQ.step='mean';SQ.msg=v==='ok'?{t:"ok",x:`Giusto: ${w.ro}. Ora il significato in italiano.`}:{t:'bad',x:`Si legge ${w.ro}${typed?'':` (ho sentito «${heard}»)`}. Ascoltala e ripetila.`};render();return;}}
+  if(step==='read'){speak(it);if(w){SQ.step='mean';SQ.msg=v==='ok'?{t:'ok',x:`Giusto: ${w.ro}.`}:{t:'bad',x:`Si legge ${w.ro}${typed?'':` (ho sentito «${heard}»)`}. Ascoltala e ripetila.`};render();return;}}
   SQ.step='done';studyRecord();render();
-  if(SQ.res.read==='ok'&&(!w||SQ.res.mean==='ok')){const tk=SQ.item;setTimeout(()=>{if(view.name==='study'&&SQ&&SQ.item===tk&&SQ.step==='done'&&!SQ.self){loadStudy(nextStudy());render();}},1300);}
 }
 
 /* ---- settings ---- */
