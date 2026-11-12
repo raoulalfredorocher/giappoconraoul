@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hiragana">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F3F4F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10131B" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>[hidden]{display:none!important}body{margin:0}
+.login{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:24px 16px;overflow:auto}
+.login .card{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px 22px;text-align:center}
+.login .g{font-family:var(--f-kana);font-size:3rem;color:var(--accent);line-height:1}
+.login h1{font-size:1.3rem;margin:8px 0 4px}
+.login input{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 14px;font:inherit;font-size:1rem;margin-top:10px}
+.login .btn{width:100%;margin-top:12px}
+.login .err{color:var(--bad);font-size:.9rem;min-height:1.3em;margin-top:10px}
+</style>
+</head>
+<body>
+<!--HEAD-->
+<div class="login" id="login" hidden>
+  <form class="card" id="login-form">
+    <div class="g" aria-hidden="true">ひ</div>
+    <h1>Hiragana a mano</h1>
+    <p class="muted small" id="login-sub">Accedi per avere gli stessi progressi su iPhone, iPad e computer.</p>
+    <input id="login-email" type="email" autocomplete="username" placeholder="Email" aria-label="Email" required>
+    <input id="login-pass" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" minlength="6" required>
+    <div class="err" id="login-err" role="alert"></div>
+    <button class="btn primary" type="submit" id="login-go">Accedi</button>
+    <button class="btn" type="button" id="login-new">Crea l'account</button>
+    <button class="linkbtn" type="button" id="login-skip" style="margin-top:14px">Continua senza account</button>
+  </form>
+</div>
+<script src="config.js"></script>
+<!--APP-->
+<script type="module">
+const cfg=window.HIRA_FIREBASE;
+if(cfg&&cfg.apiKey){
+  const V='https://www.gstatic.com/firebasejs/12.19.0/';
+  const [{initializeApp},A,F]=await Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]);
+  const app=initializeApp(cfg),auth=A.getAuth(app),db=F.getFirestore(app);
+  const $=id=>document.getElementById(id),box=$('login'),err=$('login-err');
+  const MSG={'auth/invalid-credential':'Email o password sbagliate.','auth/wrong-password':'Password sbagliata.','auth/user-not-found':'Nessun account con questa email.','auth/email-already-in-use':'Esiste già un account con questa email: usa Accedi.','auth/weak-password':'Password troppo corta: almeno 6 caratteri.','auth/invalid-email':'Email non valida.','auth/network-request-failed':'Sei senza rete. Riprova, o continua senza account.','auth/too-many-requests':'Troppi tentativi. Riprova tra qualche minuto.','auth/operation-not-allowed':'In Firebase il login con email e password non è attivo.','auth/admin-restricted-operation':'La creazione di nuovi account è disattivata.'};
+  const run=async fn=>{err.textContent='';const e=$('login-email').value.trim(),p=$('login-pass').value;if(!e||p.length<6){err.textContent='Scrivi email e password (almeno 6 caratteri).';return;}
+    try{await fn(auth,e,p);}catch(x){err.textContent=MSG[x.code]||'Non riuscito ('+(x.code||'errore')+').';}};
+  $('login-form').onsubmit=e=>{e.preventDefault();run(A.signInWithEmailAndPassword);};
+  $('login-new').onclick=()=>run(A.createUserWithEmailAndPassword);
+  $('login-skip').onclick=()=>{try{localStorage.setItem('hira-skip-login','1');}catch(e){}box.hidden=true;};
+  window.HIRA_AUTH={email:null,show:()=>{box.hidden=false;},signOut:()=>A.signOut(auth)};
+  A.onAuthStateChanged(auth,u=>{
+    window.HIRA_AUTH.email=u?u.email:null;
+    if(u){const ref=F.doc(db,'users',u.uid,'hiragana','progress');
+      window.HIRA_SYNC={get:async()=>{const s=await F.getDoc(ref);return s.exists()?s.data():null;},set:d=>F.setDoc(ref,d)};
+      box.hidden=true;dispatchEvent(new Event('hira-sync-ready'));}
+    else{window.HIRA_SYNC=null;dispatchEvent(new Event('hira-signed-out'));let skip=false;try{skip=!!localStorage.getItem('hira-skip-login');}catch(e){}box.hidden=skip;}
+    if(typeof view!=='undefined'&&view.name==='settings')render();
+  });
+}
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
