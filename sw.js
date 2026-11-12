@@ -1,5 +1,5 @@
 // Offline: the app shell is cached. Page = network first (updates arrive at once), cache when offline.
-const V='hira-f5c5731d';
+const V='hira-6cf4422d';
 const SHELL=['./','index.html','config.js','manifest.webmanifest','icons/icon-192.png'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).catch(()=>{}));});
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==V)await caches.delete(k);await self.clients.claim();})()));
