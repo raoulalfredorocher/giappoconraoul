@@ -30,7 +30,7 @@ function renderHome(app){
       <span class="sub">Tutti gli hiragana, con ordine dei tratti e pronuncia</span></span>${IC.next}</button>
   </div>
   <div style="text-align:center;margin-top:14px"><button class="btn" id="b-hist">Storico dei test</button></div>
-  <div class="home-foot">Nei test: righe da あ a ${GROUPS[S.unlocked-1].chars[0]}${st?` · serie di ${st} ${st===1?'giorno':'giorni'}`:''}</div>
+  <div class="home-foot"><span style="opacity:.5">v__VER__</span> · Nei test: righe da あ a ${GROUPS[S.unlocked-1].chars[0]}${st?` · serie di ${st} ${st===1?'giorno':'giorni'}`:''}</div>
   </div>`;
   $('#b-set').onclick=()=>go('settings');
   $('#b-daily').onclick=()=>startQuiz('daily');
