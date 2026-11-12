@@ -163,7 +163,7 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
 .thumb.empty{display:inline-block;width:40px}
 .wbtn{flex:1;min-width:0;display:flex;align-items:center;gap:12px;text-align:left;min-height:44px}
 .wbtn .k{font-family:var(--f-kana);font-size:1.45rem;min-width:4.6em}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:550;z-index:20;max-width:calc(100% - 32px)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:550;z-index:20;max-width:calc(100% - 32px);pointer-events:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .linkbtn{background:none;border:0;padding:4px 0;color:var(--accent);font:inherit;font-size:.9rem;text-decoration:underline;cursor:pointer}
 .study{text-align:center;margin-top:8px}
@@ -902,7 +902,7 @@ function loadASR(){
   asrP.catch(e=>{REC.model='error';REC.modelErr=(e&&e.message)||String(e);asrP=null;const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale non caricato: '+REC.modelErr;});
   return asrP;
 }
-function resample(f32,from,to){if(from===to)return f32;const r=from/to,n=Math.floor(f32.length/r),o=new Float32Array(n);
+function resamplePCM(f32,from,to){if(from===to)return f32;const r=from/to,n=Math.floor(f32.length/r),o=new Float32Array(n);
   for(let i=0;i<n;i++){const a=Math.floor(i*r),b=Math.min(f32.length,Math.floor((i+1)*r));let s=0;for(let j=a;j<b;j++)s+=f32[j];o[i]=s/Math.max(1,b-a);}return o;}
 const HALLU=/ご視聴|ありがとうございました|チャンネル登録|thank you|thanks for watching|sottotitoli|amara\.org|subs by|字幕/i;
 function recListen(lang,onPartial,onDone,onFail){
@@ -925,7 +925,7 @@ function recListen(lang,onPartial,onDone,onFail){
       recLevel(0);D.fine=why;D.picco=rmsMax.toFixed(3);D.durata=((performance.now()-t0)/1000).toFixed(1)+'s';
       if(!speech){fail('silence','picco '+rmsMax.toFixed(3));return;}
       const from=Math.max(0,speechIdx-4),all=new Float32Array(chunks.slice(from).reduce((a,c)=>a+c.length,0));let o=0;for(const c of chunks.slice(from)){all.set(c,o);o+=c.length;}
-      const pcm=resample(all,rate,16000);D.campioni=pcm.length;
+      const pcm=resamplePCM(all,rate,16000);D.campioni=pcm.length;
       recStatus(ASR?'Elaboro…':'Elaboro… (scarico il modello vocale, solo la prima volta)');
       try{
         const a=await loadASR();const t1=performance.now();
