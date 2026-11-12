@@ -138,21 +138,23 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:550;z-index:20;max-width:calc(100% - 32px);pointer-events:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .linkbtn{background:none;border:0;padding:4px 0;color:var(--accent);font:inherit;font-size:.9rem;text-decoration:underline;cursor:pointer}
-.study{text-align:center;margin-top:8px}
-.study .big{font-family:var(--f-kana);font-size:clamp(3.4rem,14vw,6rem);line-height:1.15;margin:8px 0}
-.ask{text-align:center;margin-top:18px}
-.ask .mic{width:84px;height:84px;border-radius:50%;border:0;margin:16px auto 6px;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);cursor:pointer}
-.ask .mic svg{width:34px;height:34px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.study{text-align:center;margin-top:4vh}
+.study .big{font-family:var(--f-kana);font-size:clamp(3.6rem,16vw,6.5rem);line-height:1.15;margin:8px 0}
+.study .sline{min-height:48px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:1.25rem;color:var(--muted);letter-spacing:.03em}
+.study .sline.it{color:var(--ink);font-weight:600;min-height:32px}
+.ask{text-align:center;margin-top:3vh;display:flex;flex-direction:column;align-items:center;gap:10px}
+.ask .mic{width:96px;height:96px;border-radius:50%;border:0;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.ask .mic svg{width:38px;height:38px}
 .ask .mic.on{background:var(--bad);animation:pulse 1.2s ease-in-out infinite}
-@keyframes pulse{50%{transform:scale(1.07)}}
+@keyframes pulse{50%{transform:scale(1.06)}}
 @media (prefers-reduced-motion:reduce){.ask .mic.on{animation:none}}
-.ask .heard{min-height:1.5em;margin-bottom:10px;color:var(--muted)}
-.ask input{flex:1;min-width:0;max-width:260px;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 12px;font:inherit;font-size:1rem}
-.choice .k svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.lvlbar{height:8px;max-width:240px;margin:6px auto;border-radius:6px;background:var(--line);overflow:hidden}
-.lvlbar #lvl{height:100%;width:0;background:var(--ok);transition:width .08s linear}
-.diagbox{margin-top:14px;text-align:left;font-size:.8rem;color:var(--muted)}
-.diagbox pre{white-space:pre-wrap;word-break:break-all;margin:6px 0 0;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font:inherit}
+.ask .heard{min-height:1.5em;color:var(--muted);font-size:1.05rem}
+.ask .heard.ok{color:var(--ok);font-weight:700;font-size:1.4rem}
+.ask .heard.bad{color:var(--bad)}
+.ask input{flex:1;min-width:0;max-width:240px;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 12px;font:inherit;font-size:1rem}
+.choice .k svg{width:28px;height:28px}
+.lvlbar{height:4px;width:120px;border-radius:4px;background:var(--line);overflow:hidden}
+.lvlbar #lvl{height:100%;width:100%;background:var(--ok);transform:scaleX(0);transform-origin:left;transition:transform .08s linear}
 </style>
 
 <div id="app"></div>

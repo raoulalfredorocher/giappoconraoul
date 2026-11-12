@@ -417,7 +417,7 @@ const NSR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 const MIC={cb:null,text:'',nativeOff:false,dictOff:{}};
 function micKind(lang){if(window.HIRA_WHISPER)return 'rec';if(DICT&&!MIC.dictOff[lang])return 'dict';if(NSR&&!MIC.nativeOff)return 'native';return null;}
 function micEnd(texts,err){const cb=MIC.cb;MIC.cb=null;if(!cb)return;if(texts&&texts.length&&texts[0])cb.onDone(texts);else cb.onFail(err||'empty');}
-function micStop(){if(REC.stop){REC.stop();return;}if(MIC.rec){try{MIC.rec.stop();}catch(e){}}if(DICT&&DICT.active())DICT.stop().catch(()=>{});}
+function micStop(){if(REC.stop){REC.stop();return;}if(MIC.cb&&MIC.cb.kind==='rec'){}if(MIC.rec){try{MIC.rec.stop();}catch(e){}}if(DICT&&DICT.active())DICT.stop().catch(()=>{});}
 // must be called synchronously from a click
 function micListen(lang,onPartial,onDone,onFail){
   const k=micKind(lang);if(!k){onFail('unavailable');return;}
@@ -433,79 +433,100 @@ function micListen(lang,onPartial,onDone,onFail){
   }catch(e){MIC.nativeOff=true;micEnd(null,'unavailable');}
 }
 
-/* ============ OWN RECORDER + WHISPER (standalone site: works in Home-screen mode and on desktop) ============ */
-const REC={diag:{},model:'idle',pct:0,stop:null,level:0,peak:0};
-function recUI(fn){try{fn();}catch(e){}}
+/* ============ OWN RECORDER + WHISPER (worker) ============ */
+// One microphone session stays open while in "Studio e ascolto": the first tap unlocks audio (iOS), later listens start by themselves.
+const REC={diag:{},model:'idle',pct:0,stop:null,status:''};
 function recStatus(t){REC.status=t;const el=document.getElementById('mic-status');if(el)el.textContent=t;}
-function recLevel(v){REC.level=v;const el=document.getElementById('lvl');if(el)el.style.width=Math.round(Math.min(1,v)*100)+'%';}
-function recDiag(){const D=REC.diag,el=document.getElementById('diag');if(!el)return;
-  el.textContent=Object.entries(D).map(([k,v])=>k+': '+v).join('\n');}
-let ASR=null,asrP=null;const asrFiles={};
+function recLevel(v){const el=document.getElementById('lvl');if(el)el.style.transform='scaleX('+Math.min(1,v).toFixed(3)+')';}
+let ASR=null,asrP=null,asrW=null,asrId=0;const asrWait={};
+function asrWorker(){
+  if(asrW)return asrW;
+  asrW=new Worker(new URL('vendor/asr-worker.js?v=__VER__',document.baseURI).href,{type:'module'});
+  asrW.onmessage=e=>{const m=e.data;
+    if(m.type==='progress')REC.pct=m.pct;
+    else if(m.type==='ready'){ASR=true;REC.model='ready';if(asrWait.load){asrWait.load.ok(true);delete asrWait.load;}}
+    else if(m.type==='result'||m.type==='error'){const w=asrWait[m.id];if(w){delete asrWait[m.id];m.type==='result'?w.ok(m.text):w.err(new Error(m.message));}
+      else if(m.type==='error'&&asrWait.load){asrWait.load.err(new Error(m.message));delete asrWait.load;}}};
+  asrW.onerror=ev=>{const msg=(ev&&ev.message)||'worker';REC.model='error';REC.modelErr=msg;asrP=null;asrW=null;ASR=null;
+    for(const k in asrWait){asrWait[k].err(new Error(msg));delete asrWait[k];}};
+  return asrW;
+}
 function loadASR(){
-  if(ASR)return Promise.resolve(ASR);if(asrP)return asrP;
+  if(ASR)return Promise.resolve(true);if(asrP)return asrP;
   REC.model='loading';
-  asrP=(async()=>{
-    const T=await import(new URL('vendor/transformers.min.js',document.baseURI).href);
-    T.env.allowLocalModels=false;T.env.useBrowserCache=true;
-    T.env.backends.onnx.wasm.wasmPaths=new URL('vendor/',document.baseURI).href;
-    T.env.backends.onnx.wasm.numThreads=1;
-    const a=await T.pipeline('automatic-speech-recognition','Xenova/whisper-base',{progress_callback:p=>{
-      if(p&&p.file&&p.total){asrFiles[p.file]={l:p.loaded||0,t:p.total};let l=0,t=0;for(const f in asrFiles){l+=asrFiles[f].l;t+=asrFiles[f].t;}REC.pct=t?Math.round(100*l/t):0;
-        const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale: scarico '+REC.pct+'% (solo la prima volta)';}}});
-    ASR=a;REC.model='ready';const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale pronto';return a;
-  })();
-  asrP.catch(e=>{REC.model='error';REC.modelErr=(e&&e.message)||String(e);asrP=null;const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale non caricato: '+REC.modelErr;});
+  asrP=new Promise((ok,err)=>{asrWait.load={ok,err};asrWorker().postMessage({type:'load'});});
+  asrP.catch(e=>{REC.model='error';REC.modelErr=(e&&e.message)||String(e);asrP=null;});
   return asrP;
+}
+function asrRun(pcm,lang){
+  return loadASR().then(()=>new Promise((ok,err)=>{const id=++asrId;asrWait[id]={ok,err};
+    setTimeout(()=>{if(asrWait[id]){delete asrWait[id];err(new Error('tempo scaduto'));}},40000);
+    asrW.postMessage({type:'run',id,pcm,lang:lang==='ja'?'japanese':'italian'},[pcm.buffer]);}));
 }
 function resamplePCM(f32,from,to){if(from===to)return f32;const r=from/to,n=Math.floor(f32.length/r),o=new Float32Array(n);
   for(let i=0;i<n;i++){const a=Math.floor(i*r),b=Math.min(f32.length,Math.floor((i+1)*r));let s=0;for(let j=a;j<b;j++)s+=f32[j];o[i]=s/Math.max(1,b-a);}return o;}
 const HALLU=/ご視聴|ありがとうございました|チャンネル登録|thank you|thanks for watching|sottotitoli|amara\.org|subs by|字幕/i;
+const MICS={AC:null,stream:null,sp:null,src:null,mute:null,onChunk:null};
+// call from a tap the first time (iOS unlocks audio only inside a user gesture)
+function micOpen(){
+  if(MICS.stream&&MICS.stream.getAudioTracks().some(t=>t.readyState==='live')){if(MICS.AC.state!=='running')MICS.AC.resume().catch(()=>{});return Promise.resolve();}
+  micClose();
+  let AC;try{AC=new (window.AudioContext||window.webkitAudioContext)();AC.resume&&AC.resume().catch(()=>{});}catch(e){return Promise.reject({code:'audio',det:e.message});}
+  MICS.AC=AC;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return Promise.reject({code:'nomic',det:'getUserMedia'});
+  return navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(stream=>{
+    if(MICS.AC!==AC){stream.getTracks().forEach(t=>t.stop());return;}
+    MICS.stream=stream;
+    const src=AC.createMediaStreamSource(stream),sp=AC.createScriptProcessor(2048,1,1),mute=AC.createGain();mute.gain.value=0;
+    src.connect(sp);sp.connect(mute);mute.connect(AC.destination);MICS.src=src;MICS.sp=sp;MICS.mute=mute;
+    sp.onaudioprocess=e=>{if(MICS.onChunk)MICS.onChunk(e.inputBuffer.getChannelData(0));};
+    if(AC.state!=='running')return AC.resume();
+  },err=>{micClose();throw {code:err&&err.name==='NotAllowedError'?'not_granted':err&&err.name==='NotFoundError'?'nomic':'audio',det:(err&&err.name)+': '+(err&&err.message)};});
+}
+function micClose(){
+  MICS.onChunk=null;
+  try{MICS.sp&&MICS.sp.disconnect();MICS.src&&MICS.src.disconnect();MICS.mute&&MICS.mute.disconnect();}catch(e){}
+  try{MICS.stream&&MICS.stream.getTracks().forEach(t=>t.stop());}catch(e){}
+  try{MICS.AC&&MICS.AC.close();}catch(e){}
+  MICS.AC=MICS.stream=MICS.sp=MICS.src=MICS.mute=null;
+}
 function recListen(lang,onPartial,onDone,onFail){
-  const D=REC.diag={app:'standalone='+!!(navigator.standalone||matchMedia('(display-mode: standalone)').matches),ua:navigator.userAgent.slice(0,90),lingua:lang};
-  REC.stop=null;REC.peak=0;
-  const fail=(code,det)=>{D.errore=code+(det?' / '+det:'');recDiag();REC.stop=null;onFail(code,det);};
-  let AC;try{AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.resume)AC.resume();}catch(e){fail('audio',e.message);return;}
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){fail('nomic','getUserMedia assente');return;}
+  const D=REC.diag={lingua:lang};REC.stop=null;
+  let finished=false;const fail=(code,det)=>{if(finished)return;finished=true;D.errore=code+(det?' / '+det:'');REC.stop=null;MICS.onChunk=null;recLevel(0);onFail(code,det);};
   loadASR().catch(()=>{});
-  navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(stream=>{
-    const tr=stream.getAudioTracks()[0];D.microfono=(tr&&tr.label)||'?';D.rate=AC.sampleRate;
-    const src=AC.createMediaStreamSource(stream),sp=AC.createScriptProcessor(4096,1,1),mute=AC.createGain();mute.gain.value=0;
-    src.connect(sp);sp.connect(mute);mute.connect(AC.destination);
-    const chunks=[];let t0=performance.now(),floor=null,nf=0,speech=false,speechIdx=0,lastLoud=0,done=false,rmsMax=0;
+  micOpen().then(()=>{
+    if(finished)return;
+    const AC=MICS.AC,rate=AC.sampleRate,chunks=[];let t0=performance.now(),floor=null,nf=0,speech=false,speechIdx=0,lastLoud=0,done=false,rmsMax=0,got=false;
     const end=async why=>{
-      if(done)return;done=true;REC.stop=null;
-      try{sp.disconnect();src.disconnect();mute.disconnect();}catch(e){}
-      try{stream.getTracks().forEach(t=>t.stop());}catch(e){}
-      const rate=AC.sampleRate;try{AC.close();}catch(e){}
-      recLevel(0);D.fine=why;D.picco=rmsMax.toFixed(3);D.durata=((performance.now()-t0)/1000).toFixed(1)+'s';
+      if(done)return;done=true;MICS.onChunk=null;REC.stop=null;recLevel(0);D.fine=why;D.picco=rmsMax.toFixed(3);
+      if(why==='stop'&&!speech){finished=true;onFail('stopped','');return;}
       if(!speech){fail('silence','picco '+rmsMax.toFixed(3));return;}
-      const from=Math.max(0,speechIdx-4),all=new Float32Array(chunks.slice(from).reduce((a,c)=>a+c.length,0));let o=0;for(const c of chunks.slice(from)){all.set(c,o);o+=c.length;}
-      const pcm=resamplePCM(all,rate,16000);D.campioni=pcm.length;
-      recStatus(ASR?'Elaboro…':'Elaboro… (scarico il modello vocale, solo la prima volta)');
+      const from=Math.max(0,speechIdx-6),sel=chunks.slice(from),all=new Float32Array(sel.reduce((a,c)=>a+c.length,0));let o=0;for(const c of sel){all.set(c,o);o+=c.length;}
+      const pcm=resamplePCM(all,rate,16000),pcmLen=pcm.length;
+      recStatus('…');
       try{
-        const a=await loadASR();const t1=performance.now();
-        const out=await a(pcm,{language:lang==='ja'?'japanese':'italian',task:'transcribe'});
-        let text=((out&&out.text)||'').trim();D.trascrizione=JSON.stringify(text);D.tempo=((performance.now()-t1)/1000).toFixed(1)+'s';
-        if(/^[(（\[].*[)）\]]$/.test(text)||/^[♪♫\s]+$/.test(text)){D.nota='scartata (rumore, non parlato)';text='';}
-        else if(pcm.length<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
-        recDiag();REC.stop=null;
+        let text=((await asrRun(pcm,lang))||'').trim();D.trascrizione=JSON.stringify(text);
+        if(/^[(（\[].*[)）\]]$/.test(text)||/^[♪♫\s]+$/.test(text))text='';
+        else if(pcmLen<16000*1.6&&HALLU.test(text))text='';
+        if(finished)return;finished=true;
         if(!text){onFail('unclear','');return;}
         onDone([text]);
       }catch(e){fail('asr',(e&&e.message)||String(e));}
     };
     REC.stop=()=>end('stop');
-    sp.onaudioprocess=e=>{if(done)return;const d=e.inputBuffer.getChannelData(0);chunks.push(new Float32Array(d));
-      let sum=0;for(let i=0;i<d.length;i++)sum+=d[i]*d[i];const rms=Math.sqrt(sum/d.length);if(rms>rmsMax)rmsMax=rms;recLevel(rms*7);
+    setTimeout(()=>{if(!done&&!got){try{AC.resume();}catch(e){}setTimeout(()=>{if(!done&&!got){done=true;micClose();fail('audio','nessun segnale dal microfono');}},1500);}},1500);
+    MICS.onChunk=d=>{if(done)return;got=true;chunks.push(new Float32Array(d));
+      let sum=0;for(let i=0;i<d.length;i++)sum+=d[i]*d[i];const rms=Math.sqrt(sum/d.length);if(rms>rmsMax)rmsMax=rms;recLevel(rms*8);
       const now=performance.now()-t0;
-      if(now<400){floor=((floor||0)*nf+rms)/(nf+1);nf++;}
-      const thr=Math.max(0.012,(floor||0)*3);
-      if(rms>thr){if(!speech){speech=true;speechIdx=chunks.length-1;recStatus('Ti sento…');}lastLoud=now;}
-      if(speech&&now-lastLoud>900)end('silenzio dopo la voce');
+      if(now<200){floor=((floor||0)*nf+rms)/(nf+1);nf++;}
+      const thr=Math.max(0.012,Math.min(0.04,(floor||0)*3));
+      if(rms>thr){if(!speech){speech=true;speechIdx=chunks.length-1;}lastLoud=now;}
+      if(speech&&now-lastLoud>500)end('fine voce');
       else if(!speech&&now>6000)end('nessuna voce');
-      else if(now>9000)end('tempo massimo');
+      else if(now>8000)end('tempo massimo');
     };
-    recStatus('Parla ora');
-  }).catch(err=>{try{AC.close();}catch(e){}fail(err&&err.name==='NotAllowedError'?'not_granted':err&&err.name==='NotFoundError'?'nomic':'audio',(err&&err.name)+': '+(err&&err.message));});
+    recStatus('');
+  }).catch(e=>fail(e&&e.code||'audio',e&&e.det||String(e)));
 }
 function wireDictation(d){
   d.onPartial(e=>{if(MIC.cb&&MIC.cb.kind==='dict')MIC.cb.onPartial(e.text);});

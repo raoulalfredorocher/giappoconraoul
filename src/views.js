@@ -30,7 +30,7 @@ function renderHome(app){
       <span class="sub">Tutti gli hiragana, con ordine dei tratti e pronuncia</span></span>${IC.next}</button>
   </div>
   <div style="text-align:center;margin-top:14px"><button class="btn" id="b-hist">Storico dei test</button></div>
-  <div class="home-foot">Nei test: righe da あ a ${GROUPS[S.unlocked-1].chars[0]}${st?` · serie di ${st} ${st===1?'giorno':'giorni'}`:''}</div>
+  <div class="home-foot"><span style="opacity:.45">v__VER__</span> · Nei test: righe da あ a ${GROUPS[S.unlocked-1].chars[0]}${st?` · serie di ${st} ${st===1?'giorno':'giorni'}`:''}</div>
   </div>`;
   $('#b-set').onclick=()=>go('settings');
   $('#b-daily').onclick=()=>startQuiz('daily');
@@ -294,93 +294,71 @@ function renderKana(app){
   setTimeout(()=>{if(view.name==='kana'&&view.ch===ch)anim();},250);
 }
 
-/* ---- study & listening (reading + meaning, by voice) ---- */
+/* ---- study & listening (reading + meaning, by voice). One tap on the mic, then it runs by itself. ---- */
 let SQ=null;
 function readWeight(k){const r=S.read[k];let w=r?3:9;if(r&&r.n)w+=8*(1-r.ok/r.n);if(r&&Date.now()-r.last<10*60e3)w*=.15;return w;}
 function nextStudy(){const recent=SQ?SQ.recent:[];
   const useWord=Math.random()<.65;
   if(useWord){const w=wpick(availWords(),x=>readWeight(x.k),x=>recent.includes(x.k));if(w)return w.k;}
   return wpick(unlockedChars(),readWeight,x=>recent.includes(x))||unlockedChars()[0];}
-function startStudy(){SQ={ok:0,n:0,recent:[]};loadStudy(nextStudy());go('study');}
-function loadStudy(item){SQ.item=item;SQ.w=WORD_MAP[item]||null;SQ.step='read';SQ.res={};SQ.heard={};SQ.partial='';SQ.listening=false;SQ.typed='';SQ.self=false;SQ.anyAnswer=false;SQ.recorded=undefined;SQ.note='';SQ.msg=null;
+function startStudy(){SQ={ok:0,n:0,recent:[],auto:false,noMic:false};loadStudy(nextStudy());go('study');}
+function loadStudy(item){SQ.item=item;SQ.w=WORD_MAP[item]||null;SQ.step='read';SQ.res={};SQ.heard='';SQ.listening=false;SQ.fail=null;SQ.good=false;SQ.recorded=undefined;SQ.line='';SQ.retry=0;
   SQ.recent.push(item);if(SQ.recent.length>8)SQ.recent.shift();}
 function studyRecord(){const ok=SQ.res.read==='ok'&&(!SQ.w||SQ.res.mean==='ok');const r=S.read[SQ.item]||(S.read[SQ.item]={n:0,ok:0,last:0});
-  if(SQ.recorded){if(SQ.recorded!==ok){r.ok+=ok?1:-1;SQ.ok+=ok?1:-1;}}else{r.n++;if(ok)r.ok++;SQ.n++;if(ok)SQ.ok++;}
+  if(SQ.recorded!==undefined){if(SQ.recorded!==ok){r.ok+=ok?1:-1;SQ.ok+=ok?1:-1;}}else{r.n++;if(ok)r.ok++;SQ.n++;if(ok)SQ.ok++;}
   SQ.recorded=ok;r.last=Date.now();save();}
+function studyAlive(tk,st){return view.name==='study'&&SQ&&SQ.item===tk&&(st===undefined||SQ.step===st);}
 function renderStudy(app){
-  const it=SQ.item,w=SQ.w,step=SQ.step,lang=step==='mean'?'it':'ja',mk=micKind(lang);
-  const badge=k=>SQ.res[k]==='ok'?'<span class="badge ok">Giusto</span>':SQ.res[k]==='no'?'<span class="badge bad">Da ripassare</span>':'';
-  const ask=step==='read'?(w?'Come si legge questa parola?':'Come si legge questo kana?'):'Cosa significa in italiano?';
-  const heard=SQ.heard[step==='done'?'':step];
-  app.innerHTML=`<div class="narrow"><div class="topbar"><button class="icon-btn" id="b-back" aria-label="Esci">${IC.close}</button><span class="title">Studio e ascolto</span><span class="spacer"></span>
-    <span class="count">${SQ.ok}/${SQ.n} giuste</span><button class="btn" id="b-skip" style="min-height:40px;padding:0 12px;font-size:.85rem" aria-label="Un'altra">${IC.shuffle}<span class="hide-phone">Un'altra</span></button></div>
-  <section class="prompt study"><div class="big">${esc(it)}</div>
-    ${step!=='read'?`<div class="row" style="justify-content:center;gap:8px"><span class="ro" style="font-size:1.15rem">${esc(w?w.ro:RO[it])}</span><button class="icon-btn plain" id="b-say" aria-label="Ascolta">${IC.sound}</button>${badge('read')}</div>`:''}
-    ${step==='done'?`<div class="row" style="justify-content:center;gap:8px;margin-top:6px"><span style="font-size:1.15rem;font-weight:650">${w?esc(w.it):(KANA_WORD[it]?esc(KANA_WORD[it]):'kana')}</span>${badge('mean')}</div>`:''}
+  const it=SQ.item,w=SQ.w,step=SQ.step,f=SQ.fail;
+  const reading=w?w.ro:RO[it],meaning=w?w.it:(KANA_WORD[it]||'');
+  const showRo=step!=='read'||!!f,showIt=step==='done'||(f&&f.step==='mean');
+  app.innerHTML=`<div class="narrow"><div class="topbar"><button class="icon-btn plain" id="b-back" aria-label="Esci">${IC.close}</button><span class="spacer"></span><span class="count">${SQ.ok}/${SQ.n}</span></div>
+  <section class="study"><div class="big">${esc(it)}</div>
+    <div class="sline">${showRo?`<span>${esc(reading)}</span><button class="icon-btn plain" id="b-say" aria-label="Ascolta">${IC.sound}</button>`:'&nbsp;'}</div>
+    <div class="sline it">${showIt&&meaning?esc(meaning):'&nbsp;'}</div>
   </section>
-  ${step!=='done'?`<div class="ask"><b>${ask}</b>
-    <div class="muted small">${mk?(step==='read'?'Tocca il microfono e dillo in giapponese.':'Tocca il microfono e dillo in italiano.')+' Oppure scrivilo.':step==='read'?'Dillo ad alta voce, poi tocca Mostra. Oppure scrivi la lettura in romaji.':'Dillo ad alta voce, poi tocca Mostra. Oppure scrivilo.'}</div>
-    ${mk?`<button class="mic ${SQ.listening?'on':''}" id="b-mic" aria-label="${SQ.listening?'Ferma':'Parla'}">${SQ.listening?IC.stop:IC.mic}</button>
-      ${mk==='rec'?`<div class="lvlbar" aria-hidden="true"><div id="lvl"></div></div><div class="heard" id="mic-status" aria-live="polite">${SQ.listening?esc(REC.status||'Parla ora'):heard?'Ho sentito: «'+esc(heard)+'»':'Tocca il microfono e parla'}</div>
-        <div class="muted small" id="model-status">${REC.model==='ready'?'Modello vocale pronto':REC.model==='loading'?'Modello vocale: scarico '+REC.pct+'% (solo la prima volta)':REC.model==='error'?'Modello vocale non caricato: '+esc(REC.modelErr||''):''}</div>`
-      :`<div class="heard" aria-live="polite">${SQ.listening?(SQ.partial?esc(SQ.partial):'Ti ascolto…'):heard?'Ho sentito: «'+esc(heard)+'»':''}</div>`}`:''}
-    ${SQ.confirm&&SQ.confirm.step===step?`<div class="fb info" style="margin:12px 0"><div>Ho sentito «${esc(SQ.confirm.heard)}».${step==='read'?` Si legge <b>${esc(w?w.ro:RO[it])}</b>.`:` Il significato è <b>${esc(w?w.it:'')}</b>.`}</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-conf="no">Sbagliato</button><button class="btn primary" data-conf="ok">Era giusto</button></div></div>`:''}
-    <form class="row" id="f-type" style="justify-content:center;flex-wrap:nowrap"><input id="i-type" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${step==='read'?'es. aki':'es. autunno'}" value="${esc(SQ.typed)}"><button class="btn primary" type="submit">Verifica</button></form>
-    <div style="margin-top:10px"><button class="btn" id="b-show">${SQ.anyAnswer?'Non lo so':'Mostra'}</button></div>
-    ${SQ.msg?`<div class="fb ${SQ.msg.t}" style="margin-top:12px">${esc(SQ.msg.x)}</div>`:''}
-    ${mk==='rec'?`<details class="diagbox"><summary>Diagnostica microfono</summary><pre id="diag">${esc(Object.entries(REC.diag||{}).map(([k,x])=>k+': '+x).join('\n')||'Nessun tentativo ancora.')}</pre></details>`:''}
-  </div>`:`<div class="ask">${SQ.self?`<div class="muted small">L'avevi detto giusto?</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-self="no">No, da ripassare</button><button class="btn primary" data-self="ok">Sì, giusto</button></div>`
-      :`${SQ.note?`<div class="fb info" style="margin-bottom:10px">${esc(SQ.note)}</div>`:''}<div class="row" style="justify-content:center">${SQ.res.read==='no'||SQ.res.mean==='no'?`<button class="btn" id="b-fix">Avevo ragione io</button>`:''}<button class="btn primary" id="b-next">Avanti ${IC.next}</button></div>`}
-    ${w?`<button class="linkbtn" id="b-write" style="margin-top:12px">Scrivila a mano</button>`:''}</div>`}
-  </div>`;
-  $('#b-back').onclick=()=>{micStop();if(SQ.n)toast(`${SQ.ok} giuste su ${SQ.n}.`);go('home');};
-  $('#b-skip').onclick=()=>{micStop();loadStudy(nextStudy());render();};
+  <div class="ask">
+    ${f?`<div class="heard bad">${f.heard?'«'+esc(f.heard)+'»':'&nbsp;'}</div>
+      <div class="row" style="justify-content:center">${f.heard?`<button class="btn" id="b-was">Era giusto</button>`:''}<button class="btn" id="b-again">Riprova</button><button class="btn primary" id="b-next">Avanti ${IC.next}</button></div>`
+    :SQ.good?`<div class="heard ok">Giusto</div>`
+    :SQ.noMic?`<form class="row" id="f-type" style="justify-content:center;flex-wrap:nowrap"><input id="i-type" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${step==='read'?'romaji':'italiano'}"><button class="btn primary" type="submit">${IC.check}</button></form>`
+    :`<button class="mic ${SQ.listening?'on':''}" id="b-mic" aria-label="${SQ.listening?'Ferma':'Parla'}">${IC.mic}</button>
+      <div class="lvlbar" aria-hidden="true"><div id="lvl"></div></div>
+      <div class="heard" id="mic-status">${esc(SQ.line||'')}</div>`}
+    ${!f&&!SQ.good?`<button class="linkbtn" id="b-show">Non lo so</button>`:''}
+  </div></div>`;
+  $('#b-back').onclick=()=>{SQ.auto=false;micStop();micClose();if(SQ.n)toast(`${SQ.ok} giuste su ${SQ.n}.`);go('home');};
   const sy=$('#b-say');if(sy)sy.onclick=()=>speak(it);
-  const nx=$('#b-next');if(nx)nx.onclick=()=>{loadStudy(nextStudy());render();};
-  const fx=$('#b-fix');if(fx)fx.onclick=()=>{SQ.res.read='ok';if(w)SQ.res.mean='ok';studyRecord();render();};
-  const wr=$('#b-write');if(wr)wr.onclick=()=>startPractice([it],0);
-  app.querySelectorAll('[data-self]').forEach(b=>b.onclick=()=>{const v=b.dataset.self;SQ.res.read=v;if(w)SQ.res.mean=v;SQ.self=false;studyRecord();render();});
-  if(step==='done')return;
-  const inp=$('#i-type');inp.oninput=()=>SQ.typed=inp.value;
-  $('#f-type').onsubmit=e=>{e.preventDefault();const v=inp.value.trim();if(!v)return;SQ.typed='';studyAnswer([v],true);};
-  $('#b-show').onclick=()=>{micStop();
-    if(!SQ.anyAnswer){SQ.self=true;SQ.step='done';speak(it);render();return;}
-    SQ.res[step]='no';
-    if(step==='read'&&w){SQ.step='mean';speak(it);SQ.msg={t:'bad',x:`Si legge ${w.ro}. Ascoltala e ripetila.`};render();return;}
-    SQ.step='done';if(step==='read')speak(it);studyRecord();render();};
-  app.querySelectorAll('[data-conf]').forEach(b=>b.onclick=()=>{const c=SQ.confirm;if(!c)return;studyResolve(c.step,b.dataset.conf,'',false,c.heard);});
-  if(micKind(lang)==='rec'&&REC.model==='idle')loadASR().catch(()=>{});
-  const mb=$('#b-mic');if(mb)mb.onclick=()=>{
-    if(SQ.listening){micStop();return;}
-    SQ.listening=true;SQ.partial='';SQ.msg=null;REC.status=micKind(lang)==='rec'?'Avvio il microfono…':'';
-    micListen(lang,t=>{SQ.partial=t;const h=$('.heard');if(h)h.textContent=t||'Ti ascolto…';},
-      texts=>{SQ.listening=false;studyAnswer(texts,false);},
-      (err,det)=>{SQ.listening=false;SQ.msg=err==='silence'?{t:'info',x:'Dal microfono non arriva voce ('+det+'). Controlla che il microfono giusto sia attivo e parla più vicino; sotto, in Diagnostica, c\u2019è il dettaglio.'}
-        :err==='unclear'?{t:'info',x:'Ti ho sentito ma non ho capito la parola. Riprova, scandendo piano.'}
-        :err==='asr'?{t:'bad',x:'Errore nel riconoscimento: '+det}
-        :err==='nomic'?{t:'bad',x:'Nessun microfono trovato ('+det+').'}
-        :err==='audio'?{t:'bad',x:'Il microfono non parte: '+det}
-        :err==='empty'?{t:'info',x:'Non ho sentito niente. Riprova, parlando vicino al microfono.'}
-        :err==='not_granted'?{t:'info',x:'Il microfono non è permesso qui. Puoi scrivere la risposta, o dirla ad alta voce e toccare Mostra.'}
-        :err==='unavailable'?{t:'info',x:lang==='ja'?'Qui la dettatura in giapponese non c’è. Scrivi la lettura in romaji, o dilla e tocca Mostra.':'Qui la dettatura non c’è. Scrivi la risposta.'}
-        :{t:'info',x:'Il microfono non ha funzionato. Riprova o scrivi la risposta.'};render();});
-    render();};
+  const mb=$('#b-mic');if(mb)mb.onclick=()=>{if(SQ.listening){SQ.auto=false;micStop();return;}SQ.auto=true;studyListen();};
+  const sh=$('#b-show');if(sh)sh.onclick=()=>{SQ.auto=false;micStop();studyFail(step,'');};
+  const ag=$('#b-again');if(ag)ag.onclick=()=>{SQ.fail=null;SQ.auto=true;studyListen();};
+  const wa=$('#b-was');if(wa)wa.onclick=()=>{const s=f.step;SQ.fail=null;SQ.auto=true;studyOk(s);};
+  const nx=$('#b-next');if(nx)nx.onclick=()=>{SQ.fail=null;studyRecord();loadStudy(nextStudy());SQ.auto=!SQ.noMic;render();if(SQ.auto)studyListen();};
+  const ft=$('#f-type');if(ft){const inp=$('#i-type');inp.focus();ft.onsubmit=e=>{e.preventDefault();const v=inp.value.trim();if(v)studyAnswer([v]);};}
 }
-async function studyAnswer(texts,typed){
-  const step=SQ.step,it=SQ.item,w=SQ.w;SQ.anyAnswer=true;SQ.heard[step]=texts[0];
-  let v=step==='read'?judgeReading(texts,it):judgeMeaning(texts,w.it),note='';
-  if(v==='unsure'){SQ.msg={t:'info',x:'Controllo…'};render();const j=await askJudge(step==='read'?'read':'mean',it,texts[0]);
-    if(SQ.item!==it||SQ.step!==step)return;
-    if(j){v=j.ok?'ok':'no';note=j.nota||'';}
-    else if(!typed){SQ.confirm={step,heard:texts[0]};SQ.msg=null;render();return;}
-    else v='no';}
-  studyResolve(step,v,note,typed,texts[0]);
+function studyListen(){
+  const tk=SQ.item,st=SQ.step,lang=st==='mean'?'it':'ja';
+  SQ.listening=true;SQ.line='';render();
+  recListen(lang,()=>{},texts=>{if(!studyAlive(tk,st))return;SQ.listening=false;studyAnswer(texts);},
+    (err,det)=>{if(!studyAlive(tk,st))return;SQ.listening=false;
+      if(err==='unclear'&&SQ.auto&&SQ.retry<2){SQ.retry++;SQ.line='Non ho capito, ripeti';render();setTimeout(()=>{if(studyAlive(tk,st)&&SQ.auto&&!SQ.listening)studyListen();},150);return;}
+      if(err==='not_granted'||err==='nomic'||err==='audio'){SQ.noMic=true;SQ.auto=false;SQ.line='';toast(err==='not_granted'?'Microfono non permesso: scrivi la risposta.':'Microfono non disponibile: scrivi la risposta.');render();return;}
+      SQ.auto=false;SQ.line=err==='unclear'?'Non ho capito':err==='asr'?'Riconoscimento non riuscito, riprova':'';render();});
 }
-function studyResolve(step,v,note,typed,heard){
-  const it=SQ.item,w=SQ.w;SQ.confirm=null;
-  SQ.res[step]=v;SQ.msg=null;SQ.note=note;
-  if(step==='read'){speak(it);if(w){SQ.step='mean';SQ.msg=v==='ok'?{t:'ok',x:`Giusto: ${w.ro}.`}:{t:'bad',x:`Si legge ${w.ro}${typed?'':` (ho sentito «${heard}»)`}. Ascoltala e ripetila.`};render();return;}}
-  SQ.step='done';studyRecord();render();
+function studyAnswer(texts){
+  const st=SQ.step,it=SQ.item,w=SQ.w;SQ.heard=texts[0];
+  const v=st==='read'?judgeReading(texts,it):(w?judgeMeaning(texts,w.it):'ok');
+  if(v==='ok')studyOk(st);else studyFail(st,texts[0]);
+}
+function studyOk(st){
+  const tk=SQ.item;SQ.res[st]='ok';SQ.retry=0;SQ.line='';
+  if(st==='read'&&SQ.w){SQ.step='mean';render();if(SQ.auto)setTimeout(()=>{if(studyAlive(tk,'mean')&&SQ.auto&&!SQ.listening)studyListen();},200);return;}
+  SQ.step='done';SQ.good=true;studyRecord();render();
+  setTimeout(()=>{if(!studyAlive(tk,'done'))return;loadStudy(nextStudy());render();if(SQ.auto&&!SQ.noMic)studyListen();},700);
+}
+function studyFail(st,heard){
+  SQ.res[st]='no';if(st==='read'&&SQ.w)SQ.res.mean=SQ.res.mean||'no';SQ.fail={step:st,heard};SQ.listening=false;SQ.line='';
+  speak(SQ.item);render();
 }
 
 /* ---- settings ---- */
@@ -431,3 +409,4 @@ render();
 let rzT;window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(pad&&document.body.contains(pad.c)){const wrap=$('#padwrap');if(wrap)fitPad(pad,wrap,76);}},150);});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>pad&&pad.draw());
 initSync();initCaps();setTimeout(()=>{if(!DB)initSync();},2000);
+if(window.HIRA_WHISPER&&window.Worker)setTimeout(()=>{loadASR().catch(()=>{});},2500);
