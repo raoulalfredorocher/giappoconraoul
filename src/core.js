@@ -415,21 +415,96 @@ function speakSys(text){
 /* ============ MICROPHONE + ANSWER CHECK ============ */
 const NSR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 const MIC={cb:null,text:'',nativeOff:false,dictOff:{}};
-function micKind(lang){if(DICT&&!MIC.dictOff[lang])return 'dict';if(NSR&&!MIC.nativeOff)return 'native';return null;}
+function micKind(lang){if(window.HIRA_WHISPER)return 'rec';if(DICT&&!MIC.dictOff[lang])return 'dict';if(NSR&&!MIC.nativeOff)return 'native';return null;}
 function micEnd(texts,err){const cb=MIC.cb;MIC.cb=null;if(!cb)return;if(texts&&texts.length&&texts[0])cb.onDone(texts);else cb.onFail(err||'empty');}
-function micStop(){if(MIC.rec){try{MIC.rec.stop();}catch(e){}}if(DICT&&DICT.active())DICT.stop().catch(()=>{});}
+function micStop(){if(REC.stop){REC.stop();return;}if(MIC.rec){try{MIC.rec.stop();}catch(e){}}if(DICT&&DICT.active())DICT.stop().catch(()=>{});}
 // must be called synchronously from a click
 function micListen(lang,onPartial,onDone,onFail){
   const k=micKind(lang);if(!k){onFail('unavailable');return;}
+  if(k==='rec'){recListen(lang,onPartial,onDone,onFail);return;}
   MIC.cb={onPartial,onDone,onFail,lang,kind:k};MIC.text='';
   if(k==='dict'){DICT.start({language:lang}).catch(e=>{const c=(e&&e.code)||'upstream_error';if(c==='unavailable')MIC.dictOff[lang]=true;micEnd(null,c);});return;}
   try{const r=new NSR();MIC.rec=r;r.lang=lang==='ja'?'ja-JP':'it-IT';r.interimResults=true;r.maxAlternatives=4;r.continuous=false;
-    let alts=[];
-    r.onresult=e=>{const res=e.results[e.results.length-1];if(res.isFinal){alts=[...res].map(a=>a.transcript.trim()).filter(Boolean);try{r.stop();}catch(_){}}else if(MIC.cb)MIC.cb.onPartial(res[0].transcript);};
+    let alts=[],lastInterim='';
+    r.onresult=e=>{const res=e.results[e.results.length-1];if(res.isFinal){alts=[...res].map(a=>a.transcript.trim()).filter(Boolean);try{r.stop();}catch(_){}}else{lastInterim=res[0].transcript;if(MIC.cb)MIC.cb.onPartial(lastInterim);}};
     r.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed')MIC.nativeOff=true;MIC.rec=null;micEnd(null,e.error==='no-speech'?'empty':e.error==='not-allowed'||e.error==='service-not-allowed'?'not_granted':'upstream_error');};
-    r.onend=()=>{MIC.rec=null;micEnd(alts,'empty');};
+    r.onend=()=>{MIC.rec=null;micEnd(alts.length?alts:lastInterim?[lastInterim]:[],'empty');};
     r.start();
   }catch(e){MIC.nativeOff=true;micEnd(null,'unavailable');}
+}
+
+/* ============ OWN RECORDER + WHISPER (standalone site: works in Home-screen mode and on desktop) ============ */
+const REC={diag:{},model:'idle',pct:0,stop:null,level:0,peak:0};
+function recUI(fn){try{fn();}catch(e){}}
+function recStatus(t){REC.status=t;const el=document.getElementById('mic-status');if(el)el.textContent=t;}
+function recLevel(v){REC.level=v;const el=document.getElementById('lvl');if(el)el.style.width=Math.round(Math.min(1,v)*100)+'%';}
+function recDiag(){const D=REC.diag,el=document.getElementById('diag');if(!el)return;
+  el.textContent=Object.entries(D).map(([k,v])=>k+': '+v).join('\n');}
+let ASR=null,asrP=null;const asrFiles={};
+function loadASR(){
+  if(ASR)return Promise.resolve(ASR);if(asrP)return asrP;
+  REC.model='loading';
+  asrP=(async()=>{
+    const T=await import(new URL('vendor/transformers.min.js',document.baseURI).href);
+    T.env.allowLocalModels=false;T.env.useBrowserCache=true;
+    T.env.backends.onnx.wasm.wasmPaths=new URL('vendor/',document.baseURI).href;
+    T.env.backends.onnx.wasm.numThreads=1;
+    const a=await T.pipeline('automatic-speech-recognition','Xenova/whisper-base',{progress_callback:p=>{
+      if(p&&p.file&&p.total){asrFiles[p.file]={l:p.loaded||0,t:p.total};let l=0,t=0;for(const f in asrFiles){l+=asrFiles[f].l;t+=asrFiles[f].t;}REC.pct=t?Math.round(100*l/t):0;
+        const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale: scarico '+REC.pct+'% (solo la prima volta)';}}});
+    ASR=a;REC.model='ready';const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale pronto';return a;
+  })();
+  asrP.catch(e=>{REC.model='error';REC.modelErr=(e&&e.message)||String(e);asrP=null;const el=document.getElementById('model-status');if(el)el.textContent='Modello vocale non caricato: '+REC.modelErr;});
+  return asrP;
+}
+function resample(f32,from,to){if(from===to)return f32;const r=from/to,n=Math.floor(f32.length/r),o=new Float32Array(n);
+  for(let i=0;i<n;i++){const a=Math.floor(i*r),b=Math.min(f32.length,Math.floor((i+1)*r));let s=0;for(let j=a;j<b;j++)s+=f32[j];o[i]=s/Math.max(1,b-a);}return o;}
+const HALLU=/ご視聴|ありがとうございました|チャンネル登録|thank you|thanks for watching|sottotitoli|amara\.org|subs by|字幕/i;
+function recListen(lang,onPartial,onDone,onFail){
+  const D=REC.diag={app:'standalone='+!!(navigator.standalone||matchMedia('(display-mode: standalone)').matches),ua:navigator.userAgent.slice(0,90),lingua:lang};
+  REC.stop=null;REC.peak=0;
+  const fail=(code,det)=>{D.errore=code+(det?' / '+det:'');recDiag();REC.stop=null;onFail(code,det);};
+  let AC;try{AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.resume)AC.resume();}catch(e){fail('audio',e.message);return;}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){fail('nomic','getUserMedia assente');return;}
+  loadASR().catch(()=>{});
+  navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}}).then(stream=>{
+    const tr=stream.getAudioTracks()[0];D.microfono=(tr&&tr.label)||'?';D.rate=AC.sampleRate;
+    const src=AC.createMediaStreamSource(stream),sp=AC.createScriptProcessor(4096,1,1),mute=AC.createGain();mute.gain.value=0;
+    src.connect(sp);sp.connect(mute);mute.connect(AC.destination);
+    const chunks=[];let t0=performance.now(),floor=null,nf=0,speech=false,speechIdx=0,lastLoud=0,done=false,rmsMax=0;
+    const end=async why=>{
+      if(done)return;done=true;REC.stop=null;
+      try{sp.disconnect();src.disconnect();mute.disconnect();}catch(e){}
+      try{stream.getTracks().forEach(t=>t.stop());}catch(e){}
+      const rate=AC.sampleRate;try{AC.close();}catch(e){}
+      recLevel(0);D.fine=why;D.picco=rmsMax.toFixed(3);D.durata=((performance.now()-t0)/1000).toFixed(1)+'s';
+      if(!speech){fail('silence','picco '+rmsMax.toFixed(3));return;}
+      const from=Math.max(0,speechIdx-4),all=new Float32Array(chunks.slice(from).reduce((a,c)=>a+c.length,0));let o=0;for(const c of chunks.slice(from)){all.set(c,o);o+=c.length;}
+      const pcm=resample(all,rate,16000);D.campioni=pcm.length;
+      recStatus(ASR?'Elaboro…':'Elaboro… (scarico il modello vocale, solo la prima volta)');
+      try{
+        const a=await loadASR();const t1=performance.now();
+        const out=await a(pcm,{language:lang==='ja'?'japanese':'italian',task:'transcribe'});
+        let text=((out&&out.text)||'').trim();D.trascrizione=JSON.stringify(text);D.tempo=((performance.now()-t1)/1000).toFixed(1)+'s';
+        if(pcm.length<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
+        recDiag();REC.stop=null;
+        if(!text){onFail('unclear','');return;}
+        onDone([text]);
+      }catch(e){fail('asr',(e&&e.message)||String(e));}
+    };
+    REC.stop=()=>end('stop');
+    sp.onaudioprocess=e=>{if(done)return;const d=e.inputBuffer.getChannelData(0);chunks.push(new Float32Array(d));
+      let sum=0;for(let i=0;i<d.length;i++)sum+=d[i]*d[i];const rms=Math.sqrt(sum/d.length);if(rms>rmsMax)rmsMax=rms;recLevel(rms*7);
+      const now=performance.now()-t0;
+      if(now<400){floor=((floor||0)*nf+rms)/(nf+1);nf++;}
+      const thr=Math.max(0.012,(floor||0)*3);
+      if(rms>thr){if(!speech){speech=true;speechIdx=chunks.length-1;recStatus('Ti sento…');}lastLoud=now;}
+      if(speech&&now-lastLoud>900)end('silenzio dopo la voce');
+      else if(!speech&&now>6000)end('nessuna voce');
+      else if(now>9000)end('tempo massimo');
+    };
+    recStatus('Parla ora');
+  }).catch(err=>{try{AC.close();}catch(e){}fail(err&&err.name==='NotAllowedError'?'not_granted':err&&err.name==='NotFoundError'?'nomic':'audio',(err&&err.name)+': '+(err&&err.message));});
 }
 function wireDictation(d){
   d.onPartial(e=>{if(MIC.cb&&MIC.cb.kind==='dict')MIC.cb.onPartial(e.text);});
@@ -677,7 +752,9 @@ function judgeReading(heards,item){
     if(c===tgt||(tgt.length===1&&c[0]===tgt&&/^(.)\1*$/.test(c)))return 'ok';
     if((KANJI[item]||[]).some(f=>cleanJa(f)===c||cleanJa(f).replace(/^お/,'')===c.replace(/^お/,'')))return 'ok';
     if(/^[a-z' -]+$/.test(c)){if(roNorm(c)===tr)return 'ok';continue;}
-    if(/^[ぁ-ゖ]+$/.test(c)){if(roNorm(kanaRo(c))===tr)return 'ok';continue;}
+    if(/^[ぁ-ゖ]+$/.test(c)){const rc=roNorm(kanaRo(c));if(rc===tr)return 'ok';
+      if(tgt.length>=2&&c.includes(tgt))return 'ok';
+      if(tr.length>=4&&lev(rc,tr)<=1)return 'ok';if(tr.length>=7&&lev(rc,tr)<=2)return 'ok';continue;}
     unsure=true;}
   return unsure?'unsure':'no';
 }

@@ -321,10 +321,14 @@ function renderStudy(app){
   ${step!=='done'?`<div class="ask"><b>${ask}</b>
     <div class="muted small">${mk?(step==='read'?'Tocca il microfono e dillo in giapponese.':'Tocca il microfono e dillo in italiano.')+' Oppure scrivilo.':step==='read'?'Dillo ad alta voce, poi tocca Mostra. Oppure scrivi la lettura in romaji.':'Dillo ad alta voce, poi tocca Mostra. Oppure scrivilo.'}</div>
     ${mk?`<button class="mic ${SQ.listening?'on':''}" id="b-mic" aria-label="${SQ.listening?'Ferma':'Parla'}">${SQ.listening?IC.stop:IC.mic}</button>
-      <div class="heard" aria-live="polite">${SQ.listening?(SQ.partial?esc(SQ.partial):'Ti ascolto…'):heard?'Ho sentito: «'+esc(heard)+'»':''}</div>`:''}
+      ${mk==='rec'?`<div class="lvlbar" aria-hidden="true"><div id="lvl"></div></div><div class="heard" id="mic-status" aria-live="polite">${SQ.listening?esc(REC.status||'Parla ora'):heard?'Ho sentito: «'+esc(heard)+'»':'Tocca il microfono e parla'}</div>
+        <div class="muted small" id="model-status">${REC.model==='ready'?'Modello vocale pronto':REC.model==='loading'?'Modello vocale: scarico '+REC.pct+'% (solo la prima volta)':REC.model==='error'?'Modello vocale non caricato: '+esc(REC.modelErr||''):''}</div>`
+      :`<div class="heard" aria-live="polite">${SQ.listening?(SQ.partial?esc(SQ.partial):'Ti ascolto…'):heard?'Ho sentito: «'+esc(heard)+'»':''}</div>`}`:''}
+    ${SQ.confirm&&SQ.confirm.step===step?`<div class="fb info" style="margin:12px 0"><div>Ho sentito «${esc(SQ.confirm.heard)}».${step==='read'?` Si legge <b>${esc(w?w.ro:RO[it])}</b>.`:` Il significato è <b>${esc(w?w.it:'')}</b>.`}</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-conf="no">Sbagliato</button><button class="btn primary" data-conf="ok">Era giusto</button></div></div>`:''}
     <form class="row" id="f-type" style="justify-content:center;flex-wrap:nowrap"><input id="i-type" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${step==='read'?'es. aki':'es. autunno'}" value="${esc(SQ.typed)}"><button class="btn primary" type="submit">Verifica</button></form>
     <div style="margin-top:10px"><button class="btn" id="b-show">${SQ.anyAnswer?'Non lo so':'Mostra'}</button></div>
     ${SQ.msg?`<div class="fb ${SQ.msg.t}" style="margin-top:12px">${esc(SQ.msg.x)}</div>`:''}
+    ${mk==='rec'?`<details class="diagbox"><summary>Diagnostica microfono</summary><pre id="diag">${esc(Object.entries(REC.diag||{}).map(([k,x])=>k+': '+x).join('\n')||'Nessun tentativo ancora.')}</pre></details>`:''}
   </div>`:`<div class="ask">${SQ.self?`<div class="muted small">L'avevi detto giusto?</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-self="no">No, da ripassare</button><button class="btn primary" data-self="ok">Sì, giusto</button></div>`
       :`${SQ.note?`<div class="fb info" style="margin-bottom:10px">${esc(SQ.note)}</div>`:''}<div class="row" style="justify-content:center">${SQ.res.read==='no'||SQ.res.mean==='no'?`<button class="btn" id="b-fix">Avevo ragione io</button>`:''}<button class="btn primary" id="b-next">Avanti ${IC.next}</button></div>`}
     ${w?`<button class="linkbtn" id="b-write" style="margin-top:12px">Scrivila a mano</button>`:''}</div>`}
@@ -344,12 +348,19 @@ function renderStudy(app){
     SQ.res[step]='no';
     if(step==='read'&&w){SQ.step='mean';speak(it);SQ.msg={t:'bad',x:`Si legge ${w.ro}. Ascoltala e ripetila.`};render();return;}
     SQ.step='done';if(step==='read')speak(it);studyRecord();render();};
+  app.querySelectorAll('[data-conf]').forEach(b=>b.onclick=()=>{const c=SQ.confirm;if(!c)return;studyResolve(c.step,b.dataset.conf,'',false,c.heard);});
+  if(micKind(lang)==='rec'&&REC.model==='idle')loadASR().catch(()=>{});
   const mb=$('#b-mic');if(mb)mb.onclick=()=>{
     if(SQ.listening){micStop();return;}
-    SQ.listening=true;SQ.partial='';SQ.msg=null;
+    SQ.listening=true;SQ.partial='';SQ.msg=null;REC.status=micKind(lang)==='rec'?'Avvio il microfono…':'';
     micListen(lang,t=>{SQ.partial=t;const h=$('.heard');if(h)h.textContent=t||'Ti ascolto…';},
       texts=>{SQ.listening=false;studyAnswer(texts,false);},
-      err=>{SQ.listening=false;SQ.msg=err==='empty'?{t:'info',x:'Non ho sentito niente. Riprova, parlando vicino al microfono.'}
+      (err,det)=>{SQ.listening=false;SQ.msg=err==='silence'?{t:'info',x:'Dal microfono non arriva voce ('+det+'). Controlla che il microfono giusto sia attivo e parla più vicino; sotto, in Diagnostica, c\u2019è il dettaglio.'}
+        :err==='unclear'?{t:'info',x:'Ti ho sentito ma non ho capito la parola. Riprova, scandendo piano.'}
+        :err==='asr'?{t:'bad',x:'Errore nel riconoscimento: '+det}
+        :err==='nomic'?{t:'bad',x:'Nessun microfono trovato ('+det+').'}
+        :err==='audio'?{t:'bad',x:'Il microfono non parte: '+det}
+        :err==='empty'?{t:'info',x:'Non ho sentito niente. Riprova, parlando vicino al microfono.'}
         :err==='not_granted'?{t:'info',x:'Il microfono non è permesso qui. Puoi scrivere la risposta, o dirla ad alta voce e toccare Mostra.'}
         :err==='unavailable'?{t:'info',x:lang==='ja'?'Qui la dettatura in giapponese non c’è. Scrivi la lettura in romaji, o dilla e tocca Mostra.':'Qui la dettatura non c’è. Scrivi la risposta.'}
         :{t:'info',x:'Il microfono non ha funzionato. Riprova o scrivi la risposta.'};render();});
@@ -360,9 +371,15 @@ async function studyAnswer(texts,typed){
   let v=step==='read'?judgeReading(texts,it):judgeMeaning(texts,w.it),note='';
   if(v==='unsure'){SQ.msg={t:'info',x:'Controllo…'};render();const j=await askJudge(step==='read'?'read':'mean',it,texts[0]);
     if(SQ.item!==it||SQ.step!==step)return;
-    if(j){v=j.ok?'ok':'no';note=j.nota||'';}else v='no';}
+    if(j){v=j.ok?'ok':'no';note=j.nota||'';}
+    else if(!typed){SQ.confirm={step,heard:texts[0]};SQ.msg=null;render();return;}
+    else v='no';}
+  studyResolve(step,v,note,typed,texts[0]);
+}
+function studyResolve(step,v,note,typed,heard){
+  const it=SQ.item,w=SQ.w;SQ.confirm=null;
   SQ.res[step]=v;SQ.msg=null;SQ.note=note;
-  if(step==='read'){speak(it);if(w){SQ.step='mean';SQ.msg=v==='ok'?{t:'ok',x:`Giusto: ${w.ro}.`}:{t:'bad',x:`Si legge ${w.ro}${typed?'':` (ho sentito «${texts[0]}»)`}. Ascoltala e ripetila.`};render();return;}}
+  if(step==='read'){speak(it);if(w){SQ.step='mean';SQ.msg=v==='ok'?{t:'ok',x:`Giusto: ${w.ro}.`}:{t:'bad',x:`Si legge ${w.ro}${typed?'':` (ho sentito «${heard}»)`}. Ascoltala e ripetila.`};render();return;}}
   SQ.step='done';studyRecord();render();
 }
 
