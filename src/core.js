@@ -486,7 +486,8 @@ function recListen(lang,onPartial,onDone,onFail){
         const a=await loadASR();const t1=performance.now();
         const out=await a(pcm,{language:lang==='ja'?'japanese':'italian',task:'transcribe'});
         let text=((out&&out.text)||'').trim();D.trascrizione=JSON.stringify(text);D.tempo=((performance.now()-t1)/1000).toFixed(1)+'s';
-        if(pcm.length<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
+        if(/^[(（\[].*[)）\]]$/.test(text)||/^[♪♫\s]+$/.test(text)){D.nota='scartata (rumore, non parlato)';text='';}
+        else if(pcm.length<16000*1.6&&HALLU.test(text)){D.nota='scartata (frase tipica di Whisper su audio breve)';text='';}
         recDiag();REC.stop=null;
         if(!text){onFail('unclear','');return;}
         onDone([text]);
