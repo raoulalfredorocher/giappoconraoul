@@ -12,6 +12,6 @@ page = read('page.html').replace('<!--HEAD-->', read('head.html')).replace('<!--
 version = hashlib.sha1(page.encode()).hexdigest()[:8]
 
 root = Path(__file__).parent
-(root / 'index.html').write_text(page.replace('__VER__', version), encoding='utf-8')
+(root / 'index.html').write_text(page, encoding='utf-8')
 (root / 'sw.js').write_text(read('sw.tpl.js').replace('__VER__', version), encoding='utf-8')
 print(f'index.html {len(page)} byte, versione {version}')
