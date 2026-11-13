@@ -343,6 +343,7 @@ function studyListen(){
   SQ.listening=true;if(!SQ.lineOk)SQ.line='';render();SQ.lineOk=false;SQ.line='';
   micListen(lang,t=>{const el=document.getElementById('mic-status');if(el&&t)el.textContent=t;},texts=>{if(!studyAlive(tk,st))return;SQ.listening=false;studyAnswer(texts);},
     (err,det)=>{if(!studyAlive(tk,st))return;SQ.listening=false;
+      if(err==='needtap'){SQ.line='';render();return;}
       if(err==='fallback'){if(micKind(lang)){loadASR().catch(()=>{});SQ.line='';render();studyListen();return;}err='unavailable';}
       if(err==='unclear'&&SQ.auto&&SQ.retry<2){SQ.retry++;SQ.line='Non ho capito, ripeti';render();setTimeout(()=>{if(studyAlive(tk,st)&&SQ.auto&&!SQ.listening)studyListen();},150);return;}
       if(err==='not_granted'||err==='nomic'||err==='audio'||err==='unavailable'){SQ.noMic=true;SQ.auto=false;SQ.line='';toast(err==='not_granted'?'Microfono non permesso: scrivi la risposta.':'Microfono non disponibile: scrivi la risposta.');render();return;}

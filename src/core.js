@@ -433,18 +433,21 @@ function micListen(lang,onPartial,onDone,onFail,accept){
   r.onresult=e=>{
     const res=e.results[e.results.length-1],list=[...res].map(a=>a.transcript.trim()).filter(Boolean);
     if(!list.length)return;heard=list;if(MIC.cb)MIC.cb.onPartial(list[0]);
+    MIC.nativeOk=true;
     if(res.isFinal){alts=list;finish(alts);return;}
     if(accept&&accept(list)){finish(list);return;}
     clearTimeout(quiet);quiet=setTimeout(()=>finish(heard),700); // ~0.7 s of no new words = done
   };
   r.onerror=e=>{if(ended)return;
-    if(e.error==='not-allowed'||e.error==='service-not-allowed'||e.error==='network'||e.error==='language-not-supported'){MIC.nativeOff=true;ended=true;MIC.rec=null;micEnd(null,'fallback');return;}
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'||e.error==='network'||e.error==='language-not-supported'){ended=true;MIC.rec=null;clearTimeout(wd);clearTimeout(cap);
+      if(MIC.nativeOk&&e.error!=='language-not-supported'){micEnd(null,'needtap');return;} // worked before: only needs a tap
+      MIC.nativeOff=true;micEnd(null,'fallback');return;}
     if(e.error==='aborted')return;
     ended=true;MIC.rec=null;micEnd(heard.length?heard:null,e.error==='no-speech'?'silence':'unclear');};
   r.onend=()=>{if(!ended)finish(alts.length?alts:heard);};
   cap=setTimeout(()=>finish(heard),8000);
   // native recognition that never starts (e.g. disabled Siri/dictation, some Home-screen apps): switch to the built-in model
-  wd=setTimeout(()=>{if(started||ended)return;ended=true;clearTimeout(cap);try{r.abort();}catch(_){}MIC.rec=null;MIC.nativeOff=true;micEnd(null,'fallback');},2500);
+  wd=setTimeout(()=>{if(started||ended)return;ended=true;clearTimeout(cap);try{r.abort();}catch(_){}MIC.rec=null;if(MIC.nativeOk){micEnd(null,'needtap');return;}MIC.nativeOff=true;micEnd(null,'fallback');},2500);
   try{r.start();}catch(e){MIC.nativeOff=true;ended=true;MIC.rec=null;micEnd(null,'fallback');}
 }
 
