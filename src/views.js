@@ -318,16 +318,17 @@ function renderStudy(app){
     <div class="sline it">${showIt&&meaning?esc(meaning):'&nbsp;'}</div>
   </section>
   <div class="ask">
-    ${f?`<div class="heard bad">${f.heard?'«'+esc(f.heard)+'»':'&nbsp;'}</div>
-      <div class="row" style="justify-content:center">${f.heard?`<button class="btn" id="b-was">Era giusto</button>`:''}<button class="btn" id="b-again">Riprova</button><button class="btn primary" id="b-next">Avanti ${IC.next}</button></div>`
-    :SQ.good?`<div class="heard ok">Giusto</div>`
+    ${f?`<div class="heard bad">${f.heard?'«'+esc(f.heard)+'» · ':''}non è giusta, ripeti</div>
+      <div class="row" style="justify-content:center"><button class="btn primary" id="b-again">${IC.mic} Riprova</button><button class="btn" id="b-next">Avanti ${IC.next}</button></div>
+      ${f.heard?`<button class="linkbtn" id="b-was">Era giusta</button>`:''}`
+    :SQ.good?`<div class="heard ok">Giusta ✓</div>`
     :SQ.noMic?`<form class="row" id="f-type" style="justify-content:center;flex-wrap:nowrap"><input id="i-type" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${step==='read'?'romaji':'italiano'}"><button class="btn primary" type="submit">${IC.check}</button></form>`
     :`<button class="mic ${SQ.listening?'on':''}" id="b-mic" aria-label="${SQ.listening?'Ferma':'Parla'}">${IC.mic}</button>
       <div class="lvlbar" aria-hidden="true"><div id="lvl"></div></div>
-      <div class="heard" id="mic-status">${esc(SQ.line||'')}</div>`}
+      <div class="heard${SQ.lineOk?' ok':''}" id="mic-status">${esc(SQ.line||'')}</div>`}
     ${!f&&!SQ.good?`<button class="linkbtn" id="b-show">Non lo so</button>`:''}
   </div></div>`;
-  $('#b-back').onclick=()=>{SQ.auto=false;micStop();micClose();if(SQ.n)toast(`${SQ.ok} giuste su ${SQ.n}.`);go('home');};
+  $('#b-back').onclick=()=>{SQ.auto=false;micStop();if(SQ.n)toast(`${SQ.ok} giuste su ${SQ.n}.`);go('home');};
   const sy=$('#b-say');if(sy)sy.onclick=()=>speak(it);
   const mb=$('#b-mic');if(mb)mb.onclick=()=>{if(SQ.listening){SQ.auto=false;micStop();return;}SQ.auto=true;studyListen();};
   const sh=$('#b-show');if(sh)sh.onclick=()=>{SQ.auto=false;micStop();studyFail(step,'');};
@@ -337,13 +338,15 @@ function renderStudy(app){
   const ft=$('#f-type');if(ft){const inp=$('#i-type');inp.focus();ft.onsubmit=e=>{e.preventDefault();const v=inp.value.trim();if(v)studyAnswer([v]);};}
 }
 function studyListen(){
-  const tk=SQ.item,st=SQ.step,lang=st==='mean'?'it':'ja';
-  SQ.listening=true;SQ.line='';render();
-  recListen(lang,()=>{},texts=>{if(!studyAlive(tk,st))return;SQ.listening=false;studyAnswer(texts);},
+  const tk=SQ.item,st=SQ.step,lang=st==='mean'?'it':'ja',it=SQ.item,w=SQ.w;
+  const accept=list=>st==='read'?judgeReading(list,it)==='ok':(w?judgeMeaning(list,w.it)==='ok':true);
+  SQ.listening=true;if(!SQ.lineOk)SQ.line='';render();SQ.lineOk=false;SQ.line='';
+  micListen(lang,t=>{const el=document.getElementById('mic-status');if(el&&t)el.textContent=t;},texts=>{if(!studyAlive(tk,st))return;SQ.listening=false;studyAnswer(texts);},
     (err,det)=>{if(!studyAlive(tk,st))return;SQ.listening=false;
+      if(err==='fallback'){if(micKind(lang)){loadASR().catch(()=>{});SQ.line='';render();studyListen();return;}err='unavailable';}
       if(err==='unclear'&&SQ.auto&&SQ.retry<2){SQ.retry++;SQ.line='Non ho capito, ripeti';render();setTimeout(()=>{if(studyAlive(tk,st)&&SQ.auto&&!SQ.listening)studyListen();},150);return;}
-      if(err==='not_granted'||err==='nomic'||err==='audio'){SQ.noMic=true;SQ.auto=false;SQ.line='';toast(err==='not_granted'?'Microfono non permesso: scrivi la risposta.':'Microfono non disponibile: scrivi la risposta.');render();return;}
-      SQ.auto=false;SQ.line=err==='unclear'?'Non ho capito':err==='asr'?'Riconoscimento non riuscito, riprova':'';render();});
+      if(err==='not_granted'||err==='nomic'||err==='audio'||err==='unavailable'){SQ.noMic=true;SQ.auto=false;SQ.line='';toast(err==='not_granted'?'Microfono non permesso: scrivi la risposta.':'Microfono non disponibile: scrivi la risposta.');render();return;}
+      SQ.auto=false;SQ.line=err==='silence'||err==='empty'?'':err==='unclear'?'Non ho capito, ripeti':'Non riuscito, riprova';render();},accept);
 }
 function studyAnswer(texts){
   const st=SQ.step,it=SQ.item,w=SQ.w;SQ.heard=texts[0];
@@ -352,7 +355,7 @@ function studyAnswer(texts){
 }
 function studyOk(st){
   const tk=SQ.item;SQ.res[st]='ok';SQ.retry=0;SQ.line='';
-  if(st==='read'&&SQ.w){SQ.step='mean';render();if(SQ.auto)setTimeout(()=>{if(studyAlive(tk,'mean')&&SQ.auto&&!SQ.listening)studyListen();},200);return;}
+  if(st==='read'&&SQ.w){SQ.step='mean';SQ.line='Giusta ✓';SQ.lineOk=true;render();if(SQ.auto)setTimeout(()=>{if(studyAlive(tk,'mean')&&SQ.auto&&!SQ.listening)studyListen();},200);return;}
   SQ.step='done';SQ.good=true;studyRecord();render();
   setTimeout(()=>{if(!studyAlive(tk,'done'))return;loadStudy(nextStudy());render();if(SQ.auto&&!SQ.noMic)studyListen();},700);
 }
@@ -409,4 +412,4 @@ render();
 let rzT;window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(pad&&document.body.contains(pad.c)){const wrap=$('#padwrap');if(wrap)fitPad(pad,wrap,76);}},150);});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>pad&&pad.draw());
 initSync();initCaps();setTimeout(()=>{if(!DB)initSync();},2000);
-if(window.HIRA_WHISPER&&window.Worker)setTimeout(()=>{loadASR().catch(()=>{});},2500);
+if(window.HIRA_WHISPER&&window.Worker&&!NSR)setTimeout(()=>{loadASR().catch(()=>{});},2500);

@@ -415,22 +415,37 @@ function speakSys(text){
 /* ============ MICROPHONE + ANSWER CHECK ============ */
 const NSR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 const MIC={cb:null,text:'',nativeOff:false,dictOff:{}};
-function micKind(lang){if(window.HIRA_WHISPER)return 'rec';if(DICT&&!MIC.dictOff[lang])return 'dict';if(NSR&&!MIC.nativeOff)return 'native';return null;}
+function micKind(lang){if(NSR&&!MIC.nativeOff)return 'native';if(window.HIRA_WHISPER&&window.Worker)return 'rec';if(DICT&&!MIC.dictOff[lang])return 'dict';return null;}
 function micEnd(texts,err){const cb=MIC.cb;MIC.cb=null;if(!cb)return;if(texts&&texts.length&&texts[0])cb.onDone(texts);else cb.onFail(err||'empty');}
-function micStop(){if(REC.stop){REC.stop();return;}if(MIC.cb&&MIC.cb.kind==='rec'){}if(MIC.rec){try{MIC.rec.stop();}catch(e){}}if(DICT&&DICT.active())DICT.stop().catch(()=>{});}
-// must be called synchronously from a click
-function micListen(lang,onPartial,onDone,onFail){
+function micStop(){if(REC.stop){REC.stop();return;}if(MIC.rec){try{MIC.rec.stop();}catch(e){}}if(DICT&&DICT.active())DICT.stop().catch(()=>{});}
+// Native recognition (Safari on iPhone/iPad/Mac, Chrome, Edge): answers in about a second.
+// accept(texts) -> true stops at once on a matching partial result.
+function micListen(lang,onPartial,onDone,onFail,accept){
   const k=micKind(lang);if(!k){onFail('unavailable');return;}
   if(k==='rec'){recListen(lang,onPartial,onDone,onFail);return;}
   MIC.cb={onPartial,onDone,onFail,lang,kind:k};MIC.text='';
   if(k==='dict'){DICT.start({language:lang}).catch(e=>{const c=(e&&e.code)||'upstream_error';if(c==='unavailable')MIC.dictOff[lang]=true;micEnd(null,c);});return;}
-  try{const r=new NSR();MIC.rec=r;r.lang=lang==='ja'?'ja-JP':'it-IT';r.interimResults=true;r.maxAlternatives=4;r.continuous=false;
-    let alts=[],lastInterim='';
-    r.onresult=e=>{const res=e.results[e.results.length-1];if(res.isFinal){alts=[...res].map(a=>a.transcript.trim()).filter(Boolean);try{r.stop();}catch(_){}}else{lastInterim=res[0].transcript;if(MIC.cb)MIC.cb.onPartial(lastInterim);}};
-    r.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed')MIC.nativeOff=true;MIC.rec=null;micEnd(null,e.error==='no-speech'?'empty':e.error==='not-allowed'||e.error==='service-not-allowed'?'not_granted':'upstream_error');};
-    r.onend=()=>{MIC.rec=null;micEnd(alts.length?alts:lastInterim?[lastInterim]:[],'empty');};
-    r.start();
-  }catch(e){MIC.nativeOff=true;micEnd(null,'unavailable');}
+  let r;try{r=new NSR();}catch(e){MIC.nativeOff=true;micEnd(null,'fallback');return;}
+  MIC.rec=r;r.lang=lang==='ja'?'ja-JP':'it-IT';r.interimResults=true;r.maxAlternatives=5;r.continuous=false;
+  let alts=[],heard=[],quiet=null,cap=null,ended=false,started=false,wd=null;
+  r.onstart=r.onaudiostart=()=>{started=true;clearTimeout(wd);};
+  const finish=list=>{if(ended)return;ended=true;clearTimeout(quiet);clearTimeout(cap);clearTimeout(wd);try{r.abort();}catch(_){}MIC.rec=null;micEnd(list,'empty');};
+  r.onresult=e=>{
+    const res=e.results[e.results.length-1],list=[...res].map(a=>a.transcript.trim()).filter(Boolean);
+    if(!list.length)return;heard=list;if(MIC.cb)MIC.cb.onPartial(list[0]);
+    if(res.isFinal){alts=list;finish(alts);return;}
+    if(accept&&accept(list)){finish(list);return;}
+    clearTimeout(quiet);quiet=setTimeout(()=>finish(heard),700); // ~0.7 s of no new words = done
+  };
+  r.onerror=e=>{if(ended)return;
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'||e.error==='network'||e.error==='language-not-supported'){MIC.nativeOff=true;ended=true;MIC.rec=null;micEnd(null,'fallback');return;}
+    if(e.error==='aborted')return;
+    ended=true;MIC.rec=null;micEnd(heard.length?heard:null,e.error==='no-speech'?'silence':'unclear');};
+  r.onend=()=>{if(!ended)finish(alts.length?alts:heard);};
+  cap=setTimeout(()=>finish(heard),8000);
+  // native recognition that never starts (e.g. disabled Siri/dictation, some Home-screen apps): switch to the built-in model
+  wd=setTimeout(()=>{if(started||ended)return;ended=true;clearTimeout(cap);try{r.abort();}catch(_){}MIC.rec=null;MIC.nativeOff=true;micEnd(null,'fallback');},2500);
+  try{r.start();}catch(e){MIC.nativeOff=true;ended=true;MIC.rec=null;micEnd(null,'fallback');}
 }
 
 /* ============ OWN RECORDER + WHISPER (worker) ============ */
