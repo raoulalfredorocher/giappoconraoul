@@ -12,7 +12,7 @@ def fnv(s):
     for i in range(0, len(b), 2):
         h ^= b[i] | (b[i+1] << 8); h = (h * 0x01000193) & 0xffffffff
     return '%08x' % h
-OVR = {'はは': 'ハハ'}
+OVR = {'はは': 'ハハ', 'あらう': '洗う', 'つかう': '使う'}
 SINGLE = set(json.load(open('single.json')))
 def tokata(s): return ''.join(chr(ord(c)+0x60) if 'ぁ'<=c<='ゖ' else c for c in s)
 texts = json.load(open('texts.json')) + list(FIX.keys())

@@ -46,7 +46,7 @@
 毎|まい|ogni
 間|あいだ|intervallo, fra
 先|さき|prima, davanti
-昨|さく|precedente (昨日 ieri)
+昨|さく|ieri, precedente (昨日)
 去|さる|andarsene; passato (去年)
 早|はやい|presto
 遅|おそい|tardi, in ritardo
@@ -195,7 +195,7 @@
 室|しつ|stanza
 屋|や|negozio; tetto
 館|かん|edificio (grande)
-院|いん|istituto (病院 ospedale)
+院|いん|istituto, ospedale (病院)
 寺|てら|tempio buddista
 社|しゃ|azienda; santuario
 港|みなと|porto
@@ -212,17 +212,17 @@
 語|ご|lingua, parola
 教|おしえる|insegnare
 習|ならう|imparare
-勉|べん|sforzo (勉強 studio)
+勉|べん|sforzo, studio (勉強)
 試|ためす|provare, mettere alla prova
-験|けん|verifica (試験 esame)
+験|けん|esame, verifica (試験)
 問|もん|domanda
 題|だい|tema, titolo
 答|こたえ|risposta
-漢|かん|Cina antica (漢字 kanji)
+漢|かん|Cina, kanji (漢字)
 英|えい|inglese; eccellente
 科|か|materia, sezione
 紙|かみ|carta
-宿|やど|alloggio (宿題 compiti)
+宿|やど|alloggio, locanda (宿題 compiti)
 # Cibo e bevande|食べ物と飲み物
 米|こめ|riso
 飯|めし|riso cotto, pasto
@@ -235,7 +235,7 @@
 塩|しお|sale
 味|あじ|sapore
 料|りょう|tariffa; ingrediente
-理|り|ragione (料理 cucina)
+理|り|ragione, logica (料理 cucina)
 麦|むぎ|grano, orzo
 豆|まめ|fagiolo, legume
 油|あぶら|olio
@@ -332,7 +332,7 @@
 電|でん|elettricità
 鉄|てつ|ferro
 船|ふね|nave
-機|き|macchina (飛行機 aereo)
+機|き|macchina, meccanismo (飛行機 aereo)
 飛|とぶ|volare
 旅|たび|viaggio
 転|てん|girare (自転車 bicicletta)
@@ -356,7 +356,7 @@
 # Lavoro e società|仕事と社会
 仕|し|servire (仕事 lavoro)
 事|こと|cosa, faccenda
-医|い|medicina (医者 medico)
+医|い|medicina, medico (医者)
 病|びょう|malattia (病気)
 公|こう|pubblico
 世|よ|mondo, epoca
