@@ -43,12 +43,17 @@ async function tplPoints(page, ch) {
   }), STROKES[ch]);
 }
 // disegna un carattere nella casella `cell` del foglio con tocco (o penna)
-async function drawChar(page, ch, cell = 0, { pen = false, jitter = 2.5, scale = 0.92, dx = 0, dy = 0 } = {}) {
+async function drawChar(page, ch, cell = 0, { pen = false, jitter = 2.5, scale = 0.92, dx = 0, dy = 0, rtl = false } = {}) {
   const box = await page.evaluate(() => { const c = document.querySelector('canvas.pad'); const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, cw: c.width }; });
   const strokes = await tplPoints(page, ch);
   const cellPx = await page.evaluate(() => { const c = document.querySelector('canvas.pad'); return parseFloat(c.dataset.cell || '0'); });
-  const cols = Math.round(box.w / cellPx), k = cellPx / 109;
-  const ox = box.x + (cell % cols) * cellPx, oy = box.y + Math.floor(cell / cols) * cellPx;
+  const free = await page.evaluate(() => document.querySelector('canvas.pad').dataset.free === '1');
+  const cols = Math.round(box.w / cellPx);
+  // rettangolo libero: i caratteri si rimpiccioliscono per starci, con spazi irregolari
+  const n = free ? (await page.evaluate(() => window.JCA.item().target ? [...window.JCA.item().target].length : 1)) : 1;
+  const slot = free ? Math.min(cellPx, box.w / n) : cellPx, k = slot / 109;
+  const pos = free && rtl ? n - 1 - cell : cell;
+  const ox = free ? box.x + pos * slot + ((pos * 37) % 7 - 3) * k : box.x + (cell % cols) * cellPx, oy = free ? box.y + (cellPx - slot) / 2 : box.y + Math.floor(cell / cols) * cellPx;
   const cdp = await page.context().newCDPSession(page);
   let seed = ch.charCodeAt(0) * 7 + cell; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280 - 0.5; };
   for (const s of strokes) {
@@ -158,7 +163,18 @@ async function exerciseRound(page, label, { wrong = false } = {}) {
   console.log('5. Hiragana › Vocabolario (parola intera)');
   await tap(page, '#s-vocab'); await sleep(200);
   await page.screenshot({ path: `${SHOTS}/06-vocab.png` });
+  ok(await page.evaluate(() => document.querySelector('canvas.pad').dataset.free === '1'), 'un solo rettangolo per la parola');
   for (let i = 0; i < 10; i++) await exerciseRound(page, 'Scrittura');
+  for (let i = 0; i < 4; i++) { // scritta da destra a sinistra
+    const it = await item(page); await drawWord(page, it.target, { rtl: true }); await tap(page, '#x-check'); await sleep(100);
+    const fb = await fbText(page); ok(/fb (ok|tip)/.test(fb), `destra→sinistra: ${it.target} → ${fb.replace(/\n/g, ' ').slice(0, 80)}`);
+    if (await page.$('#x-next')) await tap(page, '#x-next'); else { await tap(page, '#x-skip'); await tap(page, '#x-next'); } }
+  { // parola sbagliata
+    const it = await item(page); const w = [...it.target]; w[0] = w[0] === 'の' ? 'あ' : 'の'; await drawWord(page, w.join('')); await tap(page, '#x-check'); await sleep(100);
+    ok(/fb bad/.test(await fbText(page)), 'parola sbagliata segnalata: ' + w.join(''));
+    await page.screenshot({ path: `${SHOTS}/06b-vocab-errore.png` });
+    await tap(page, '#x-retry'); await drawWord(page, it.target); await tap(page, '#x-check'); await sleep(100);
+    { const f2 = await fbText(page); ok(/fb (ok|tip)/.test(f2), 'Riprova parola poi giusta: ' + f2.slice(0, 120) + ' strokes=' + await page.evaluate(() => window.JCA && JSON.stringify(Object.keys(window.JCA)))); } await tap(page, '#x-next'); }
   await tap(page, '[data-mode="audio"]');
   for (let i = 0; i < 6; i++) await exerciseRound(page, 'Vocab audio');
   await tap(page, '#x-back'); await tap(page, '#b-back');
