@@ -89,6 +89,7 @@ export function renderExercise(app) {
   }
   const n = it.target ? [...it.target].length : 0;
   const done = Q.phase === 'done';
+  const train = Q.kind === 'train';
   const showAnswer = done || Q.phase === 'bad';
   const big = it.showKanji ? `<div class="bigk">${esc(it.showKanji)}</div>`
     : it.audio ? `<button class="playbig" id="x-play" aria-label="${esc(t('play'))}">${IC.play}<span>${esc(t(Q.played ? 'replay' : 'play'))}</span></button>`
@@ -98,13 +99,17 @@ export function renderExercise(app) {
     ${it.needIt ? `<input class="ans" id="x-it" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('italianPh'))}" value="${esc(Q.vals.it)}" ${done ? 'readonly' : ''}>` : ''}`;
   const reveal = showAnswer && done ? `<div class="reveal">${it.target || it.k ? `<span class="k">${esc(it.target || it.k)}</span>` : ''}<span>${esc(it.ro)}${it.it ? ' · ' + esc(it.it) : ''}</span></div>` : '';
   const listenBtn = it.listen || (done && it.say) ? `<button class="btn" id="x-say">${IC.sound}${esc(t('play'))}</button>` : '';
-  const actions = done ? `${listenBtn}<button class="btn primary grow" id="x-next">${esc(t('next'))} ${IC.next}</button>`
+  // Allenamento kana: riga compatta (lettura + Ascolta rotondo, oppure Ascolta + risposta), foglio grande sotto
+  const sndBtn = id => `<button class="sndbtn${id === 'x-play' ? ' lg' : ''}" id="${id}" aria-label="${esc(t(id === 'x-play' && Q.played ? 'replay' : 'play'))}">${IC.sound}</button>`;
+  const prompt = !train ? null : it.audio ? `<section class="prompt tp">${sndBtn('x-play')}${inputs}${reveal}</section>`
+    : `<section class="prompt tp"><div class="tp-main"><div class="big">${esc(it.show)}</div>${ask}</div>${sndBtn('x-say')}${reveal}</section>`;
+  const actions = done ? `${train ? '' : listenBtn}<button class="btn primary grow" id="x-next">${esc(t('next'))} ${IC.next}</button>`
     : Q.phase === 'bad' ? `<button class="btn" id="x-skip">${esc(t('next'))}</button><button class="btn primary grow" id="x-retry">${esc(t('retry'))}</button>`
     : `<button class="btn primary grow" id="x-check">${IC.check} ${esc(t('check'))}</button>`;
   if (sc === 'kanji') app.innerHTML = kanjiView(it, done, actions);
-  else app.innerHTML = head + `<div class="quiz ${it.pad ? '' : 'nopad'}">
-    <div class="side"><section class="prompt">${big}${ask}${inputs}${reveal}
-      ${!done && it.listen && !it.audio ? `<div class="row">${listenBtn}</div>` : ''}${Q.fallback && Q.kind === 'vocab' ? `<div class="muted small">${esc(t('fewWords'))}</div>` : ''}</section></div>
+  else app.innerHTML = head + `<div class="quiz ${it.pad ? '' : 'nopad'}${train ? ' train' : ''}">
+    <div class="side">${prompt || `<section class="prompt">${big}${ask}${inputs}${reveal}
+      ${!done && it.listen && !it.audio ? `<div class="row">${listenBtn}</div>` : ''}${Q.fallback && Q.kind === 'vocab' ? `<div class="muted small">${esc(t('fewWords'))}</div>` : ''}</section>`}</div>
     <div class="fbslot" id="x-fb">${Q.msg ? `<div class="fb ${Q.msg.type}">${Q.msg.lines.map(esc).join('<br>')}</div>` : ''}</div>
     ${it.pad ? `<div class="padwrap" id="x-padwrap"><canvas class="pad" id="x-pad" aria-label="Foglio"></canvas>
       <div class="tools">${!done ? `<button class="icon-btn" id="x-clear" aria-label="${esc(t('clearAll'))}">${IC.clear}</button><button class="icon-btn" id="x-undo" aria-label="${esc(t('undo'))}">${IC.undo}</button><button class="btn" id="x-model">${IC.eye}<span class="hide-phone">${esc(t('model'))}</span></button>` : ''}${actions}</div></div>`
@@ -118,7 +123,7 @@ export function renderExercise(app) {
     pad.cellFb = Q.cellFb.slice();
     pad.ghost = Q.ghost ? [...it.target].map((c, i) => (Q.cellFb[i] && Q.cellFb[i].state === 'ok' ? null : c)) : [];
     if (it.labels) pad.labels = [...it.target].map(c => labelFor(c));
-    if (sc === 'kanji') fitKanji(); else fitPad(pad, $('#x-padwrap'), 76);
+    if (sc === 'kanji') fitKanji(); else if (train) fitTrain(app); else fitPad(pad, $('#x-padwrap'), 76);
     pad.locked = done || Q.phase === 'bad';
     
   } else { pad = null; if (sc === 'kanji') fitKanji(); }
@@ -127,7 +132,7 @@ export function renderExercise(app) {
   if (ro) ro.oninput = () => (Q.vals.ro = ro.value);
   if (itn) itn.oninput = () => (Q.vals.it = itn.value);
   [ro, itn].forEach(el => el && (el.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const b = $('#x-check') || $('#x-next') || $('#x-retry'); b && b.click(); } }));
-  const play = $('#x-play'); if (play) play.onclick = () => { Q.played = true; speak(it.say, 3); play.querySelector('span').textContent = t('replay'); };
+  const play = $('#x-play'); if (play) play.onclick = () => { Q.played = true; speak(it.say, 3); const sp = play.querySelector('span'); if (sp) sp.textContent = t('replay'); else play.setAttribute('aria-label', t('replay')); };
   const say = $('#x-say'); if (say) say.onclick = () => speak(it.say, 1);
   const bc = $('#x-check'); if (bc) bc.onclick = doCheck;
   const bn = $('#x-next'); if (bn) bn.onclick = () => { stopSpeech(); Q.played = false; nextItem(); renderExercise(app); };
@@ -184,6 +189,25 @@ function fitKanji() {
 }
 let kResizeT = null;
 window.addEventListener('resize', () => { clearTimeout(kResizeT); kResizeT = setTimeout(() => { if (Q && Q.script === 'kanji' && $('#x-kq')) fitKanji(); }, 120); });
+// Allenamento: la schermata riempie l'altezza visibile; il foglio prende lo spazio che resta
+// (con un margine fisso per il messaggio dopo Controlla, così il foglio non cambia misura).
+function fitTrain(app) {
+  const q = $('.quiz.train', app), wrap = $('#x-padwrap'); if (!q || !wrap) return;
+  const root = document.getElementById('app') || app, pb = parseFloat(getComputedStyle(root).paddingBottom) || 0;
+  const top = q.getBoundingClientRect().top + (window.scrollY || 0);
+  q.style.height = Math.max(0, Math.floor(window.innerHeight - top - pb)) + 'px';
+  q.classList.add('measuring');
+  const tools = $('.tools', wrap), th = tools ? tools.getBoundingClientRect().height : 48;
+  const wide = getComputedStyle(q).display === 'grid';
+  fitPad(pad, wrap, th + 10 + pb + (wide ? 0 : 66), 900);
+  q.classList.remove('measuring');
+}
+let lastW = window.innerWidth, rzT = 0;
+addEventListener('resize', () => {
+  if (!Q || !Q.rerender || Q.script === 'kanji' || window.innerWidth === lastW) return; // la tastiera cambia solo l'altezza: si ignora
+  lastW = window.innerWidth; clearTimeout(rzT);
+  rzT = setTimeout(() => { if (Q && Q.rerender) { Q.keepStrokes = true; Q.rerender(); } }, 150);
+});
 function wireHead(app) {
   $('#x-back').onclick = () => { stopSpeech(); const g = Q.go, sc = Q.script; if (Q.n) toast(`${Q.ok}/${Q.n} ${t('ok')}`); Q = null; pad = null; g(sc === 'kanji' ? 'kanjiHome' : 'section', { script: sc }); };
   $$('[data-mode]').forEach(b => (b.onclick = () => { if (b.dataset.mode === Q.mode) return; stopSpeech(); Q.mode = b.dataset.mode; setUi(`${Q.script}.${Q.kind}`, Q.mode); Q.played = false; nextItem(); renderExercise(app); }));
