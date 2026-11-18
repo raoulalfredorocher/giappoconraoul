@@ -197,13 +197,12 @@ export class Pad {
 }
 
 // Sceglie lato e colonne in base allo spazio disponibile e alla dimensione scelta in Impostazioni
-export function fitPad(pad, wrap, reserve = 80) {
+export function fitPad(pad, wrap, reserve = 80, maxCell = 560) {
   const w = Math.max(200, (wrap.clientWidth || 320) - 2);
   const top = pad.c.getBoundingClientRect().top;
   const availH = Math.max(180, window.innerHeight - Math.max(0, top) - reserve);
   // Grande = tutto lo spazio utile; Medio = 70% del lato; Piccolo = 40%
   const f = { l: 1, m: 0.7, s: 0.4 }[device.padSize || 'l'] || 1;
-  const maxCell = 560;
   const n = pad.n;
   if (n === 1) { const base = Math.max(180, Math.min(w, maxCell, availH)); pad.layout(Math.floor(Math.max(110, base * f)), 1); return; }
   if (pad.free) { // un solo rettangolo largo per tutta la parola (Medio/Piccolo riducono l'altezza)
