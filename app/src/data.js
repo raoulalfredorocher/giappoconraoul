@@ -2,6 +2,7 @@
 import WH from './words-hira.js';
 import WK from './words-kata.js';
 import KL from '../data/kanji-list.txt';
+import SJ from '../data/strokes-kanji.json';
 
 // Righe in hiragana: le righe katakana si ricavano spostando il codice Unicode (+0x60).
 const HROWS = [
@@ -77,8 +78,18 @@ function parseWords(raw, script) {
 }
 export const WORDS = { hira: parseWords(WH, 'hira'), kata: parseWords(WK, 'kata') };
 
-// Kanji: simbolo, lettura (per la voce), significato
-export const KANJI = KL.split('\n').filter(Boolean).map(l => { const [k, yomi, it] = l.split('|'); return { k, yomi, it, ro: romaji(yomi) }; });
+// Kanji per categoria: righe "# Nome|名前", poi simbolo|lettura (per la voce)|significato.
+// Entrano solo i kanji con il modello dei tratti (servono per scrivere e correggere).
+export const KCATS = [];
+for (const l of KL.split('\n')) {
+  if (!l.trim()) continue;
+  if (l[0] === '#') { const [it, ja] = l.slice(1).trim().split('|'); KCATS.push({ id: 'c' + KCATS.length, it, ja, items: [] }); continue; }
+  const [k, yomi, it] = l.split('|');
+  if (!SJ[k]) continue;
+  if (!KCATS.length) KCATS.push({ id: 'c0', it: 'Kanji', ja: '漢字', items: [] });
+  KCATS[KCATS.length - 1].items.push({ k, yomi, it, ro: romaji(yomi) });
+}
+export const KANJI = KCATS.flatMap(c => c.items);
 
 // A quale riga appartiene un kana (per filtrare le parole in base alle righe scelte)
 const ROW_OF = {};

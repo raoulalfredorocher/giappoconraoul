@@ -241,7 +241,11 @@ async function exerciseRound(page, label, { wrong = false } = {}) {
   for (let i = 0; i < 5; i++) await exerciseRound(page, 'Kanji simbolo');
   await tap(page, '[data-mode="kaudio"]');
   for (let i = 0; i < 5; i++) await exerciseRound(page, 'Kanji audio');
-  await tap(page, '#x-back'); await tap(page, '#j-list'); await tap(page, '[data-ch="山"]'); await sleep(600);
+  await tap(page, '#x-back'); await tap(page, '#j-list'); await sleep(100);
+  ok(await page.evaluate(() => document.querySelectorAll('details.kcat').length >= 10 && !document.querySelector('details.kcat[open]')), 'kanji: categorie chiuse');
+  await tap(page, 'details.kcat:has([data-ch="山"]) summary'); await sleep(100);
+  ok(await page.evaluate(() => document.querySelector('details.kcat:has([data-ch="山"])').open), 'kanji: categoria Natura aperta');
+  await tap(page, '[data-ch="山"]'); await sleep(600);
   await drawChar(page, '山'); await tap(page, '#k-check'); await sleep(100);
   ok(/fb (ok|tip)/.test(await page.evaluate(() => document.querySelector('#k-fb .fb').className)), 'scheda kanji 山: giusto');
   await ctx.close();
