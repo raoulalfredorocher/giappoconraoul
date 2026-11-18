@@ -201,12 +201,14 @@ export function fitPad(pad, wrap, reserve = 80) {
   const w = Math.max(200, (wrap.clientWidth || 320) - 2);
   const top = pad.c.getBoundingClientRect().top;
   const availH = Math.max(180, window.innerHeight - Math.max(0, top) - reserve);
-  const maxCell = { l: 560, m: 380, s: 250 }[device.padSize || 'l'];
+  // Grande = tutto lo spazio utile; Medio = 70% del lato; Piccolo = 40%
+  const f = { l: 1, m: 0.7, s: 0.4 }[device.padSize || 'l'] || 1;
+  const maxCell = 560;
   const n = pad.n;
-  if (n === 1) { pad.layout(Math.floor(Math.max(180, Math.min(w, maxCell, availH))), 1); return; }
-  if (pad.free) { // un solo rettangolo largo per tutta la parola
+  if (n === 1) { const base = Math.max(180, Math.min(w, maxCell, availH)); pad.layout(Math.floor(Math.max(110, base * f)), 1); return; }
+  if (pad.free) { // un solo rettangolo largo per tutta la parola (Medio/Piccolo riducono l'altezza)
     const h = Math.floor(Math.max(130, Math.min(maxCell * 0.6, availH, Math.max(w / n * 1.05, w * 0.3))));
-    pad.layoutFree(h, Math.floor(w)); return;
+    pad.layoutFree(Math.floor(Math.max(90, h * Math.max(f, 0.55))), Math.floor(w)); return;
   }
   // il minor numero di righe che lascia caselle comode (si scrive da sinistra a destra)
   const minCell = Math.min(125, Math.floor(w / 2)), cap = Math.floor(maxCell * 0.6);
@@ -217,5 +219,6 @@ export function fitPad(pad, wrap, reserve = 80) {
     if (rows > 1 && rows * cell > availH) cell = Math.max(minCell, Math.floor(availH / rows));
     if (cell >= minCell || cols === 1) { best = { cell, cols }; break; }
   }
+  best.cell = Math.floor(Math.max(f < 1 ? 64 : 0, best.cell * f));
   pad.layout(best.cell, best.cols);
 }
