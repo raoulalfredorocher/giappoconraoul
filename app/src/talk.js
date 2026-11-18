@@ -173,6 +173,13 @@ function injectCss() {
 @keyframes tpulse{0%,100%{box-shadow:0 0 0 0 rgba(211,51,51,.45)}50%{box-shadow:0 0 0 18px rgba(211,51,51,0)}}
 .t-lbl{font-weight:650;font-size:1.1rem;min-height:1.4em}.t-lbl.ok{color:var(--ok)}.t-lbl.retry{color:var(--tip)}
 .t-msg{max-width:460px;text-align:center}
-.t-tools{display:flex;gap:10px;width:100%;justify-content:center}.t-tools .btn{flex:1;max-width:220px}`;
+.t-tools{display:flex;gap:10px;width:100%;justify-content:center}.t-tools .btn{flex:1;max-width:220px}
+@media (max-height:760px){.talk{gap:10px}.t-card{min-height:130px;padding:10px 12px}.t-mic{width:clamp(80px,13vh,104px);height:clamp(80px,13vh,104px)}.t-sym.k1{font-size:clamp(4rem,min(34vw,15vh),11rem)}}
+@media (orientation:landscape) and (min-width:700px){
+  .talk{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,1fr);grid-template-rows:1fr auto auto 1fr;column-gap:28px;max-width:1040px;width:100%;align-items:center}
+  .talk>.t-card{grid-column:1;grid-row:1/5;height:100%}
+  .talk>.t-heard{grid-column:2;grid-row:2;align-self:end}.talk>.t-micwrap{grid-column:2;grid-row:3}.talk>.t-tools{grid-column:2;grid-row:4;align-self:start}
+  .t-sym.k1{font-size:clamp(6rem,30vh,12rem)}
+}`;
   document.head.appendChild(s);
 }

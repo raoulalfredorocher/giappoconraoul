@@ -195,11 +195,20 @@ function fitTrain(app) {
   const q = $('.quiz.train', app), wrap = $('#x-padwrap'); if (!q || !wrap) return;
   const root = document.getElementById('app') || app, pb = parseFloat(getComputedStyle(root).paddingBottom) || 0;
   const top = q.getBoundingClientRect().top + (window.scrollY || 0);
-  q.style.height = Math.max(0, Math.floor(window.innerHeight - top - pb)) + 'px';
+  const qh = Math.max(0, Math.floor(window.innerHeight - top - pb));
+  q.style.height = qh + 'px';
   q.classList.add('measuring');
   const tools = $('.tools', wrap), th = tools ? tools.getBoundingClientRect().height : 48;
   const wide = getComputedStyle(q).display === 'grid';
-  fitPad(pad, wrap, th + 10 + pb + (wide ? 0 : 66), 900);
+  if (wide) { // iPad/PC orizzontale: a sinistra domanda e pulsanti, a destra il foglio alto quanto lo schermo
+    const side = $('.side', q), colW = q.clientWidth - side.getBoundingClientRect().width - 20;
+    const ct = pad.c.getBoundingClientRect().top;
+    fitPad(pad, { clientWidth: colW + 2 }, window.innerHeight - ct - qh, 900);
+    if (tools) tools.style.maxWidth = '';
+  } else {
+    fitPad(pad, wrap, th + 10 + pb, 900);
+    if (tools) tools.style.maxWidth = Math.max(340, Math.round(pad.c.getBoundingClientRect().width)) + 'px';
+  }
   q.classList.remove('measuring');
 }
 let lastW = window.innerWidth, rzT = 0;
