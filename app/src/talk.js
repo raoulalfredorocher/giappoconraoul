@@ -19,11 +19,11 @@ const TX = {
     denied: 'Il microfono non è permesso. Consentilo per questo sito e riprova.',
     pwa: 'Dall’icona Home il microfono può non funzionare: apri il sito in Safari.',
     dict: 'Su iPhone/iPad attiva Dettatura: Impostazioni › Generali › Tastiera.',
-    net: 'Il riconoscimento vocale ha bisogno di internet.', noRows: 'Scegli almeno una riga nell’Alfabeto.' },
+    net: 'Il riconoscimento vocale ha bisogno di internet.', noAudio: 'Il microfono non si è acceso. Tocca di nuovo; se succede ancora, controlla in Impostazioni › Safari › Microfono.', busy: 'Il microfono è usato da un’altra app. Chiudila e riprova.', noRows: 'Scegli almeno una riga nell’Alfabeto.' },
   ja: { talk: '話す', talkSub: 'こえに 出して 読む', letters: '文字', words: 'ことば', tap: 'タップして 読む', listening: 'きいています…', ok: 'せいかい！',
     again: 'もう一度', heard: 'きこえた', none: 'きこえませんでした。', listen: 'きく', skip: 'つぎへ',
     noSR: 'この ブラウザは 音声認識が ありません。', denied: 'マイクを 許可してください。', pwa: 'Safari で ひらいてください。',
-    dict: '音声入力を オンにしてください。', net: 'インターネットが ひつようです。', noRows: '五十音で ぎょうを えらんでください。' },
+    dict: '音声入力を オンにしてください。', net: 'インターネットが ひつようです。', noAudio: 'マイクが つきませんでした。', busy: 'マイクが ほかの アプリで つかわれています。', noRows: '五十音で ぎょうを えらんでください。' },
 };
 export const tt = k => (TX[lang()] || TX.it)[k] || TX.it[k];
 const MIC = '<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>';
@@ -57,53 +57,56 @@ export function startTalk(script, go) {
 }
 
 // ---- microfono ----
-// Su Safari (iPhone/iPad) il riconoscimento è fragile: un'istanza nuova per ogni tentativo, si riparte solo
-// dopo che la precedente è davvero chiusa (onend), e la sessione audio resta "registra e suona" per tutta la
-// schermata (passare a "solo suono" tra un tentativo e l'altro spegne il microfono dal secondo in poi).
-const wait = ms => new Promise(r => setTimeout(r, ms));
-function setSession(t) { try { if (navigator.audioSession && navigator.audioSession.type !== t) navigator.audioSession.type = t; } catch (e) {} }
-let closing = Promise.resolve(), pending = false, attempt = 0;
+// Come una pagina qualsiasi che usa il riconoscimento vocale di Safari, senza trucchi:
+// - la sessione audio NON viene toccata (se "Ascolta" l'aveva messa su "solo suono", torna "auto", che permette il microfono);
+// - start() parte sempre dentro il tocco, mai dopo un'attesa o da un timer;
+// - un riconoscitore nuovo per ogni tentativo; finché il precedente non ha chiuso il microfono resta grigio.
+// Se qualcosa va storto, sotto compare il motivo reale (codice dell'errore, se l'audio è arrivato).
+let closing = false, attempt = 0;
+function freeSession() { try { if (navigator.audioSession && navigator.audioSession.type === 'playback') navigator.audioSession.type = 'auto'; } catch (e) {} }
 function closeRec(hard) {
   clearTimeout(timer);
-  const r = rec; if (!r) return closing;
-  rec = null; r.onresult = r.onerror = r.onaudiostart = r.onspeechstart = null; pending = true;
-  closing = new Promise(res => {
-    let d = false; const f = () => { if (!d) { d = true; pending = false; res(); } };
-    r.onend = f; setTimeout(f, 1500); // se onend non arriva non resta bloccato
-    try { hard ? r.abort() : r.stop(); } catch (e) { f(); }
-  });
-  return closing;
+  const r = rec; if (!r) return;
+  rec = null; r.onresult = r.onerror = r.onaudiostart = r.onspeechstart = r.onstart = null;
+  closing = true;
+  let d = false; const f = () => { if (d) return; d = true; closing = false; const m = $('#t-mic'); if (m) m.classList.remove('wait'); };
+  r.onend = f; setTimeout(f, 1200);
+  try { hard ? r.abort() : r.stop(); } catch (e) { f(); }
 }
 export function exitTalk() { T = null; leaveTalk(); }
-export function enterTalk() { setMicMode(true); setSession('play-and-record'); }
-export function leaveTalk() { attempt++; clearTimeout(advT); closeRec(true).then(() => { if (T === null) { setMicMode(false); setSession('playback'); } }); }
+export function enterTalk() { setMicMode(true); freeSession(); }
+export function leaveTalk() { attempt++; clearTimeout(advT); closeRec(true); if (T === null) setMicMode(false); }
 
-async function startRec(app, auto = 0) {
+function startRec(app) {
   if (!SR) { T.msg = tt('noSR'); T.state = 'err'; return draw(app); }
+  if (closing) return; // il tentativo prima sta ancora chiudendo: il tocco dopo funziona
   const my = ++attempt;
-  stopSpeech(); clearTimeout(advT);
-  T.state = 'listen'; T.msg = ''; if (!auto) T.heard = '';
-  draw(app);
-  enterTalk();
-  // di solito parte subito, dentro il tocco; aspetta solo se il riconoscitore di prima sta ancora chiudendo
-  if (rec || pending || auto) { await closeRec(true); await wait(auto ? 400 : 250); if (my !== attempt || !T) return; }
-  const r = new SR(); rec = r;
-  r.lang = 'ja-JP'; r.interimResults = true; r.maxAlternatives = 5; r.continuous = false;
-  const item = T.item, t0 = Date.now(); let got = false, heardAudio = false, finished = false;
-  const alts = [];
+  stopSpeech(); clearTimeout(advT); enterTalk();
+  const item = T.item, t0 = Date.now(), alts = [];
+  let got = false, audio = false, finished = false, code = '';
+  let r;
+  try {
+    r = new SR();
+    r.lang = 'ja-JP'; r.interimResults = true; r.maxAlternatives = 5; r.continuous = false;
+  } catch (e) { T.state = 'err'; T.msg = tt('noSR'); T.diag = String(e && e.name || e); return draw(app); }
+  const diag = () => [code || (audio ? (got ? 'parlato' : 'nessuna parola') : 'audio non arrivato'), `${((Date.now() - t0) / 1000).toFixed(1)}s`, (navigator.audioSession && navigator.audioSession.type) || ''].filter(Boolean).join(' · ');
   const done = ok => {
-    if (finished || my !== attempt) return; finished = true; closeRec(false);
-    if (ok) { score(T.tries === 0 && !T.reveal); T.state = 'ok'; draw(app); advT = setTimeout(() => { if (T && T.item === item && view() === 'talk') { next(); draw(app); } }, 1100); return; }
-    // chiuso subito senza aver sentito nulla: riparte da solo una volta, senza dire niente
-    if (!got && !heardAudio && Date.now() - t0 < 1500 && auto < 1) { startRec(app, auto + 1); return; }
+    if (finished || my !== attempt) return; finished = true;
+    if (rec === r) closeRec(false);
+    if (ok) { score(T.tries === 0 && !T.reveal); T.state = 'ok'; T.diag = ''; draw(app); advT = setTimeout(() => { if (T && T.item === item && view() === 'talk') { next(); draw(app); } }, 1100); return; }
     T.tries++; if (T.tries >= 2) T.reveal = true;
     if (got) score(false);
-    T.state = 'retry'; T.msg = got ? '' : tt('none'); draw(app);
+    T.state = 'retry';
+    T.msg = got ? '' : !audio ? tt('noAudio') : tt('none');
+    T.diag = got ? '' : diag();
+    draw(app);
   };
-  r.onaudiostart = () => { heardAudio = true; };
-  r.onspeechstart = () => { heardAudio = true; };
+  r.onstart = () => { if (my === attempt) T.diag = ''; };
+  r.onaudiostart = () => { audio = true; };
+  r.onspeechstart = () => { audio = true; };
   r.onresult = e => {
     if (my !== attempt) return;
+    audio = true;
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const res = e.results[i];
       for (let j = 0; j < res.length; j++) { const tx = res[j].transcript; if (tx && tx.trim()) { got = true; alts.push(tx); } }
@@ -113,18 +116,23 @@ async function startRec(app, auto = 0) {
     if (matches(item, alts.slice(-12))) done(true);
   };
   r.onerror = e => {
-    const c = e && e.error;
-    if (c === 'no-speech' || c === 'aborted') return; // decide onend
     if (my !== attempt || finished) return;
-    finished = true; closeRec(true);
+    code = (e && e.error) || 'errore';
+    if (code === 'no-speech' || code === 'aborted') return; // decide onend
+    finished = true; if (rec === r) closeRec(true);
     T.state = 'err';
-    T.msg = c === 'not-allowed' || c === 'service-not-allowed'
+    T.msg = code === 'not-allowed' || code === 'service-not-allowed'
       ? [tt('denied'), IOS ? (STANDALONE() ? tt('pwa') : tt('dict')) : ''].filter(Boolean).join(' ')
-      : c === 'network' ? tt('net') : tt('none');
+      : code === 'audio-capture' ? tt('busy') : code === 'network' ? tt('net') : tt('none');
+    T.diag = diag();
     draw(app);
   };
   r.onend = () => { if (rec === r) rec = null; done(matches(item, alts)); };
-  try { r.start(); } catch (e) { rec = null; if (auto < 1) return startRec(app, auto + 1); finished = true; T.state = 'err'; T.msg = tt('none'); return draw(app); }
+  rec = r;
+  try { r.start(); } catch (e) { rec = null; T.state = 'err'; T.msg = tt('none'); T.diag = 'start: ' + (e && e.name || e); return draw(app); }
+  // la schermata si aggiorna solo dopo l'avvio, così l'avvio resta dentro il tocco
+  T.state = 'listen'; T.heard = ''; T.msg = ''; T.diag = '';
+  draw(app);
   timer = setTimeout(() => { if (rec === r) { try { r.stop(); } catch (e) {} } }, 7000);
 }
 
@@ -152,9 +160,9 @@ function draw(app) {
       <div class="t-ro">${showRo ? esc(sc === 'kanji' ? `${it.say} · ${it.ro}` : it.ro) : '&nbsp;'}</div>
       <div class="t-it">${showRo && it.it ? esc(it.it) : '&nbsp;'}</div></div>
     <div class="t-heard" id="t-heard" lang="ja">${T.heard ? esc(`「${T.heard}」`) : ''}</div>
-    <div class="t-micwrap"><button class="t-mic ${st}" id="t-mic" aria-label="${esc(tt('tap'))}">${st === 'ok' ? IC.check : MIC}</button>
+    <div class="t-micwrap"><button class="t-mic ${st}${closing ? ' wait' : ''}" id="t-mic" aria-label="${esc(tt('tap'))}">${st === 'ok' ? IC.check : MIC}</button>
       <div class="t-lbl ${st}" role="status" aria-live="polite">${esc(lbl)}</div>
-      ${T.msg ? `<div class="fb ${st === 'err' ? 'bad' : 'info'} t-msg">${esc(T.msg)}</div>` : ''}</div>
+      ${T.msg ? `<div class="fb ${st === 'err' ? 'bad' : 'info'} t-msg">${esc(T.msg)}</div>` : ''}${T.diag ? `<div class="t-diag">${esc(T.diag)}</div>` : ''}</div>
     <div class="t-tools"><button class="btn" id="t-say">${IC.sound}${esc(tt('listen'))}</button><button class="btn" id="t-skip">${esc(tt('skip'))} ${IC.next}</button></div>
   </div>`;
   wire(app);
@@ -199,7 +207,7 @@ function injectCss() {
 .t-mic.ok{background:var(--ok);color:#fff}.t-mic.retry{background:var(--tip,#c80);color:#fff}
 @keyframes tpulse{0%,100%{box-shadow:0 0 0 0 rgba(211,51,51,.45)}50%{box-shadow:0 0 0 18px rgba(211,51,51,0)}}
 .t-lbl{font-weight:650;font-size:1.1rem;min-height:1.4em}.t-lbl.ok{color:var(--ok)}.t-lbl.retry{color:var(--tip)}
-.t-msg{max-width:460px;text-align:center}
+.t-msg{max-width:460px;text-align:center}.t-diag{font-size:.78rem;color:var(--muted);opacity:.8}.t-mic.wait{opacity:.5}
 .t-tools{display:flex;gap:10px;width:100%;justify-content:center}.t-tools .btn{flex:1;max-width:220px}
 @media (max-height:760px){.talk{gap:10px}.t-card{min-height:130px;padding:10px 12px}.t-mic{width:clamp(80px,13vh,104px);height:clamp(80px,13vh,104px)}.t-sym.k1{font-size:clamp(4rem,min(34vw,15vh),11rem)}}
 @media (orientation:landscape) and (min-width:700px){

@@ -2,6 +2,7 @@
 // - se si avvia mentre il precedente non ha ancora chiuso, finisce subito senza sentire nulla;
 // - se la sessione audio è "playback", o è passata a "playback" mentre il microfono era aperto, non sente nulla (no-speech);
 // - start() deve partire dal tocco (gesto dell'utente), non dopo un'attesa;
+// - la sessione audio deve restare quella predefinita (auto);
 // - stop/abort chiudono in modo asincrono (onend arriva dopo).
 // Uso: python3 -m http.server 8765, poi node test/talk-safari.js
 const { chromium } = require('playwright');
@@ -16,20 +17,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     window.HIRA_FIREBASE = null;
     // come WebKit: passare a "playback" mentre il microfono cattura lo lascia muto per i tentativi dopo
     let ty = 'auto'; window.__muted = false; window.__setAt = 0;
-    const sess = { get type() { return ty; }, set type(v) { if (v === 'playback' && window.__active > 0) window.__muted = true; ty = v; } };
+    const sess = { get type() { return ty; }, set type(v) { if (v === 'playback' && window.__active > 0) window.__muted = true; window.__sessLog.push(v); ty = v; } };
+    window.__sessLog = [];
     Object.defineProperty(navigator, 'audioSession', { get: () => sess });
     window.__log = []; window.__active = 0; window.__maxActive = 0; window.__mode = 'right';
     class SR {
       start() {
-        window.__gesture = navigator.userActivation ? navigator.userActivation.isActive : true;
-        if (!window.__gesture) window.__log.push('no-gesture');
+        // Safari: senza il tocco in corso il riconoscimento viene rifiutato
+        const ev = window.event; window.__gesture = !!(ev && (ev.type === 'click' || ev.type === 'pointerup' || ev.type === 'touchend'));
+        if (!window.__gesture) { window.__log.push('no-gesture'); const me = this; setTimeout(() => { me.onerror && me.onerror({ error: 'not-allowed' }); me.onend && me.onend(); }, 20); return; }
         if (this.started) throw new Error('InvalidStateError'); this.started = true;
         const me = this, busy = window.__active > 0;
         window.__active++; window.__maxActive = Math.max(window.__maxActive, window.__active);
         const end = () => { if (me.ended) return; me.ended = true; window.__active--; setTimeout(() => me.onend && me.onend(), 10); };
         this._end = end;
         if (busy) { window.__log.push('busy'); setTimeout(end, 30); return; }
-        if (navigator.audioSession.type === 'playback' || window.__muted) { window.__log.push('mic-off'); setTimeout(() => { me.onerror && me.onerror({ error: 'no-speech' }); end(); }, 300); return; }
+        if (navigator.audioSession.type !== 'auto' || window.__muted) { window.__log.push('mic-off'); setTimeout(() => { me.onerror && me.onerror({ error: 'no-speech' }); end(); }, 300); return; }
         window.__log.push('ok');
         setTimeout(() => { if (me.ended) return; me.onstart && me.onstart(); me.onaudiostart && me.onaudiostart(); }, 40);
         setTimeout(() => {
@@ -49,7 +52,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   });
   const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', e => errs.push(e.message));
   await pg.goto(URL0); await pg.click('#h-hira'); await pg.click('#s-talk'); await pg.waitForSelector('#t-mic');
-  const state = () => pg.evaluate(() => document.querySelector('.t-mic').className.replace('t-mic', '').trim() || 'idle');
+  const state = () => pg.evaluate(() => document.querySelector('.t-mic').className.replace(/t-mic|wait/g, '').trim() || 'idle');
   const until = async (want, ms = 4000) => { const t = Date.now(); while (Date.now() - t < ms) { const s = await state(); if (want.includes(s)) return s; await sleep(40); } return await state(); };
   // 10 giuste di fila, aspettando che avanzi da solo
   for (let i = 1; i <= 10; i++) {
@@ -73,14 +76,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await until(['idle'], 3000); await pg.click('#t-mic'); await pg.click('#t-mic'); await sleep(100); await pg.click('#t-mic');
   ok(['ok', 'retry', 'listen'].includes(await until(['ok', 'retry'])), 'tocchi multipli: nessun blocco');
   // esco e rientro: funziona ancora
-  await pg.click('#t-back'); await pg.click('#s-talk'); await pg.waitForSelector('#t-mic');
+  await pg.click('#t-back'); await pg.click('#s-talk'); await pg.waitForSelector('#t-mic'); await sleep(500);
   await pg.click('#t-mic'); ok(await until(['ok', 'retry']) === 'ok', 'uscito e rientrato: funziona');
   const info = await pg.evaluate(() => ({ log: window.__log, max: window.__maxActive, sess: navigator.audioSession.type }));
   ok(info.max <= 1, `mai due riconoscitori aperti insieme (max ${info.max})`);
   ok(!info.log.includes('mic-off'), 'microfono mai spento dalla sessione audio');
-  ok(info.log.filter(x => x === 'no-gesture').length <= 2, `avvio dal tocco (${info.log.filter(x => x === 'no-gesture').length} avvii fuori dal tocco)`);
-  ok(info.sess === 'play-and-record', 'sessione audio registra e suona dentro Parla');
-  await pg.click('#t-back'); await sleep(1700); ok(await pg.evaluate(() => navigator.audioSession.type) === 'playback', 'uscito da Parla: sessione audio torna normale');
+  ok(info.log.filter(x => x === 'no-gesture').length === 0, `avvio dal tocco (${info.log.filter(x => x === 'no-gesture').length} avvii fuori dal tocco)`);
+  ok(info.sess === 'auto', 'sessione audio lasciata ad auto dentro Parla');
+  await pg.click('#t-back'); await sleep(1700); await pg.click('#b-home'); await pg.click('#h-hira'); await pg.click('#s-talk'); await pg.click('#t-say'); await sleep(200); await pg.evaluate(() => (window.__mode = 'right')); await pg.click('#t-mic');
+  ok(await until(['ok', 'retry']) === 'ok', 'Ascolta e poi microfono: funziona');
   ok(!errs.length, 'nessun errore JS ' + errs.join(' | '));
   console.log('avvii:', info.log.join(' '));
   await b.close(); console.log(`${p} ok, ${f} errori`); process.exit(f ? 1 : 0);
