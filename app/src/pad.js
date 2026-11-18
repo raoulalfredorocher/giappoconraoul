@@ -15,6 +15,8 @@ export class Pad {
     this.cellFb = []; // per casella: {ch, state:'ok'|'bad', showTpl, hl:[]}
     this.ghost = []; // per casella: carattere da mostrare in grigio
     this.labels = null;
+    this.free = n > 1; // parola: un solo rettangolo, i caratteri si separano da soli
+    this.order = 1; // 1 = sinistra→destra, -1 = destra→sinistra (scelto al controllo)
     const pt = e => { const r = this.c.getBoundingClientRect(); const k = U * this.cols / r.width; return [(e.clientX - r.left) * k, (e.clientY - r.top) * k]; };
     canvas.addEventListener('pointerdown', e => {
       if (this.locked) return;
@@ -47,8 +49,57 @@ export class Pad {
     this.c.width = Math.round(cell * this.cols * dpr); this.c.height = Math.round(cell * this.rows * dpr);
     this.draw();
   }
-  origin(i) { return [(i % this.cols) * U, Math.floor(i / this.cols) * U]; }
+  // rettangolo libero: larghezza W in unità, altezza U
+  layoutFree(h, w) {
+    const dpr = window.devicePixelRatio || 1;
+    this.cols = w / h; this.rows = 1; this.cell = h; this.c.dataset.cell = h; this.c.dataset.free = '1';
+    this.c.style.width = w + 'px'; this.c.style.height = h + 'px';
+    this.c.width = Math.round(w * dpr); this.c.height = Math.round(h * dpr);
+    this.draw();
+  }
+  // separa i tratti in n caratteri secondo la posizione orizzontale (tollera dimensioni e spazi diversi)
+  segment() {
+    const ss = this.strokes.filter(s => s.length);
+    const key = ss.length + ':' + ss.reduce((a, s) => a + s.length, 0) + ':' + this.order;
+    const sg0 = this._seg;
+    if (sg0 && sg0.key === key && sg0.ss.length === ss.length && ss.every((s, i) => s === sg0.ss[i])) return sg0;
+    const it = ss.map(s => { let a = Infinity, b = -Infinity; for (const p of s) { if (p[0] < a) a = p[0]; if (p[0] > b) b = p[0]; } return { s, a, b, c: (a + b) / 2 }; }).sort((p, q) => p.a - q.a);
+    let cl = [];
+    for (const x of it) {
+      const last = cl[cl.length - 1], w = x.b - x.a;
+      // un tratto si unisce al carattere se si sovrappone (anche poco) in orizzontale
+      if (last && x.a < last.b - Math.min(3, w * 0.25) + 2) { last.m.push(x); last.b = Math.max(last.b, x.b); }
+      else cl.push({ a: x.a, b: x.b, m: [x] });
+    }
+    const n = this.n;
+    while (cl.length > n) { // troppi pezzi: unisce la coppia vicina più stretta
+      let bi = 0, bw = Infinity;
+      for (let i = 0; i < cl.length - 1; i++) { const w = Math.max(cl[i].b, cl[i + 1].b) - cl[i].a; if (w < bw) { bw = w; bi = i; } }
+      const A = cl[bi], B = cl[bi + 1]; cl.splice(bi, 2, { a: A.a, b: Math.max(A.b, B.b), m: A.m.concat(B.m) });
+    }
+    while (cl.length < n) { // pochi pezzi: divide il più largo dove i tratti si separano meglio
+      let bi = -1, bw = 0; cl.forEach((c, i) => { if (c.m.length > 1 && c.b - c.a > bw) { bw = c.b - c.a; bi = i; } });
+      if (bi < 0) break;
+      const m = cl[bi].m.slice().sort((p, q) => p.c - q.c); let bk = 1, bg = -Infinity;
+      for (let k = 1; k < m.length; k++) { const L = m.slice(0, k), R = m.slice(k); const g = Math.min(...R.map(r => r.a)) - Math.max(...L.map(l => l.b)) + 0.3 * Math.min(k, m.length - k); if (g > bg) { bg = g; bk = k; } }
+      const L = m.slice(0, bk), R = m.slice(bk), mk = q => ({ a: Math.min(...q.map(r => r.a)), b: Math.max(...q.map(r => r.b)), m: q });
+      cl.splice(bi, 1, mk(L), mk(R));
+    }
+    if (this.order < 0) cl.reverse();
+    const idx = new Map(); cl.forEach((c, i) => c.m.forEach(x => idx.set(x.s, i)));
+    return (this._seg = { key, ss, idx, cx: cl.map(c => (c.a + c.b) / 2) });
+  }
+  origin(i) {
+    if (!this.free) return [(i % this.cols) * U, Math.floor(i / this.cols) * U];
+    const sg = this.strokes.length ? this.segment() : null;
+    if (sg && sg.cx[i] !== undefined) return [sg.cx[i] - U / 2, 0];
+    const W = this.cols * U, sw = W / this.n, j = this.order < 0 ? this.n - 1 - i : i;
+    return [(j + 0.5) * sw - U / 2, 0];
+  }
+  // scala dei modelli in grigio quando lo spazio per carattere è più stretto della casella
+  ghostScale() { return this.free ? Math.min(1, this.cols / this.n) : 1; }
   cellOf(s) {
+    if (this.free) { const i = this.segment().idx.get(s); return i === undefined ? 0 : i; }
     let cx = 0, cy = 0; for (const p of s) { cx += p[0]; cy += p[1]; } cx /= s.length; cy /= s.length;
     const c = Math.max(0, Math.min(this.cols - 1, Math.floor(cx / U))), r = Math.max(0, Math.min(this.rows - 1, Math.floor(cy / U)));
     return Math.min(this.n - 1, r * this.cols + c);
@@ -59,8 +110,13 @@ export class Pad {
     for (const s of this.strokes) { if (!s.length) continue; const i = this.cellOf(s), [ox, oy] = this.origin(i); g[i].push(s.map(([x, y]) => [x - ox, y - oy])); }
     return g;
   }
+  // in parola libera: gruppi in entrambi i versi di scrittura
+  groupsBoth() {
+    const o = this.order; this.order = 1; const f = this.groups(); this.order = -1; const r = this.groups(); this.order = o; this._seg = null;
+    return [f, r];
+  }
   clear() { this.strokes = []; this.cellFb = []; this.stopAnim(); this.draw(); }
-  clearBad() { this.strokes = this.strokes.filter(s => { const f = this.cellFb[this.cellOf(s)]; return f && f.state === 'ok'; }); this.cellFb = this.cellFb.map(f => (f && f.state === 'ok' ? f : null)); this.draw(); }
+  clearBad() { if (this.free) { this.clear(); return; } this.strokes = this.strokes.filter(s => { const f = this.cellFb[this.cellOf(s)]; return f && f.state === 'ok'; }); this.cellFb = this.cellFb.map(f => (f && f.state === 'ok' ? f : null)); this.draw(); }
   undo() { this.strokes.pop(); this.draw(); }
   stopAnim() { if (this.anim) { cancelAnimationFrame(this.anim.raf); this.anim = null; } }
 
@@ -71,7 +127,7 @@ export class Pad {
     for (let i = 0; i < this.n; i++) {
       const [ox, oy] = this.origin(i); x.save(); x.translate(ox, oy);
       const f = this.cellFb[i], g = this.ghost[i];
-      if (g && !(this.anim && this.anim.cell === i)) this.tplAll(g, css('--ghost'), true);
+      if (g && !(this.anim && this.anim.cell === i)) { const sc = this.ghostScale(); x.save(); x.translate(54.5 * (1 - sc), 54.5 * (1 - sc)); x.scale(sc, sc); this.tplAll(g, css('--ghost'), true); x.restore(); }
       if (f && (f.showTpl || (f.hl && f.hl.length))) {
         const t = tpl(f.ch), hl = f.hl || [];
         if (t) { for (let s = 0; s < t.d.length; s++) this.tplStroke(f.ch, s, hl.includes(s) ? css('--tip') : css('--ghost'), hl.includes(s) ? 6 : 5);
@@ -88,7 +144,7 @@ export class Pad {
       }
       x.restore();
     }
-    if (this.labels) { // pronuncia piccola in alto a sinistra di ogni casella
+    if (this.labels && !this.free) { // pronuncia piccola in alto a sinistra di ogni casella
       x.save(); x.fillStyle = css('--muted'); x.font = '500 8px Inter, sans-serif'; x.textBaseline = 'top';
       this.labels.forEach((l, i) => { if (!l) return; const [ox, oy] = this.origin(i); x.fillText(l, ox + 5, oy + 4); });
       x.restore();
@@ -96,6 +152,7 @@ export class Pad {
   }
   guides() {
     const x = this.ctx; x.save(); x.strokeStyle = css('--grid'); x.lineWidth = 0.5; x.setLineDash([2, 2.2]); x.beginPath();
+    if (this.free) { x.moveTo(4, 54.5); x.lineTo(this.cols * U - 4, 54.5); x.stroke(); x.restore(); return; }
     for (let i = 0; i < this.n; i++) { const [ox, oy] = this.origin(i); x.moveTo(ox + 54.5, oy + 4); x.lineTo(ox + 54.5, oy + 105); x.moveTo(ox + 4, oy + 54.5); x.lineTo(ox + 105, oy + 54.5); }
     x.stroke(); x.setLineDash([]); x.lineWidth = 0.9; x.beginPath();
     for (let i = 0; i < this.n; i++) { const [ox, oy] = this.origin(i); if (ox > 0) { x.moveTo(ox, oy + 3); x.lineTo(ox, oy + U - 3); } if (oy > 0) { x.moveTo(ox + 3, oy); x.lineTo(ox + U - 3, oy); } }
@@ -149,6 +206,10 @@ export function fitPad(pad, wrap, reserve = 80) {
   const maxCell = 560;
   const n = pad.n;
   if (n === 1) { const base = Math.max(180, Math.min(w, maxCell, availH)); pad.layout(Math.floor(Math.max(110, base * f)), 1); return; }
+  if (pad.free) { // un solo rettangolo largo per tutta la parola (Medio/Piccolo riducono l'altezza)
+    const h = Math.floor(Math.max(130, Math.min(maxCell * 0.6, availH, Math.max(w / n * 1.05, w * 0.3))));
+    pad.layoutFree(Math.floor(Math.max(90, h * Math.max(f, 0.55))), Math.floor(w)); return;
+  }
   // il minor numero di righe che lascia caselle comode (si scrive da sinistra a destra)
   const minCell = Math.min(125, Math.floor(w / 2)), cap = Math.floor(maxCell * 0.6);
   let best = null;
