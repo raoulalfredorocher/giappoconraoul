@@ -1,5 +1,5 @@
 rules_version = '2';
-// Ogni utente legge e scrive solo i propri progressi: users/{uid}/hiragana/progress
+// Solo l'utente autenticato legge e scrive i propri dati (users/{uid}/hiragana/japan). Tutto il resto è negato.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid}/hiragana/{doc} {
