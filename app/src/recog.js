@@ -38,7 +38,7 @@ export function tpl(ch) {
   const ds = SD[ch]; if (!ds) return null;
   if (!svgEl) {
     svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svgEl.setAttribute('width', '0'); svgEl.setAttribute('height', '0'); svgEl.style.position = 'absolute'; svgEl.setAttribute('aria-hidden', 'true');
+    svgEl.setAttribute('width', '0'); svgEl.setAttribute('height', '0'); svgEl.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none'; svgEl.setAttribute('aria-hidden', 'true');
     pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path'); svgEl.appendChild(pathEl); document.body.appendChild(svgEl);
   }
   const raw = ds.map(d => {
