@@ -1,40 +1,36 @@
-# Giappo con Raoul — Hiragana a mano
+# Japan con Alfredo — ジャパン・コン・アルフレード
 
-App personale per imparare a scrivere e leggere gli hiragana, su iPhone, iPad (anche con Apple Pencil) e computer.
-Sito statico su GitHub Pages; login e progressi su Firebase (piano gratuito).
+App personale per imparare il giapponese scrivendo a mano: iPhone, iPad (anche con Apple Pencil) e computer.
+Sito statico su GitHub Pages; account e progressi su Firebase (piano gratuito).
 
-- **Test di oggi**: 10 domande, dai kana alle parole.
-- **Ripasso**: quello che hai scritto torna dopo 1, 2, 4, 8 e 16 giorni.
-- **Studio e ascolto**: leggi ad alta voce al microfono e di' il significato.
-- **Allenamento** senza fine e **Alfabeto** con ordine dei tratti e pronuncia.
+- **Home**: ひらがな, カタカナ, 漢字, 文法 e 総合日本語 (Giapponese completo).
+- **Hiragana / Katakana**: Alfabeto (righe scelte salvate), Allenamento (Lettere, Audio), Vocabolario (Scrittura, Audio).
+- **Kanji**: kanji di base (o il PDF), Allenamento (Scrivi il kanji, Simbolo, Audio). Grammatica e Giapponese completo: in arrivo.
+- **Impostazioni**: tema chiaro/scuro, lingua italiano/日本語, correzione, foglio, aiuti, solo Apple Pencil, voce lenta/normale.
 
 ## Struttura
 
 | File | Cosa fa |
 |---|---|
-| `index.html`, `sw.js` | Generati da `build.py`: non modificarli a mano. |
-| `config.js` | Configurazione web di Firebase. Se è `null` l'app funziona senza account. |
-| `src/core.js` | Dati (kana, parole), ripasso, voce, microfono, foglio di scrittura. |
-| `src/recog.js` | Riconoscimento della scrittura e consigli sulla forma. |
-| `src/views.js` | Schermate. |
-| `src/page.html` | Pagina, login e collegamento a Firebase. |
-| `firestore.rules` | Regole da incollare in Firebase › Firestore › Regole. |
+| `index.html` | Pagina, stile, login e collegamento a Firebase. |
+| `app.js` | Generato da `app/build.sh`: non modificarlo a mano. |
+| `app/src/*.js` | Sorgenti (moduli separati: niente nomi in conflitto). `exercise.js` esercizi, `recog.js` riconoscimento, `pad.js` foglio, `store.js` salvataggio, `views.js` schermate. |
+| `app/data/` | Tratti KanjiVG (hiragana, katakana, kanji) ed elenco dei kanji. |
+| `pdf/` | PDF opzionali: `hiragana.pdf`, `katakana.pdf`, `kanji.pdf`. |
+| `test/e2e.js` | Test nel browser con tocco e Apple Pencil simulati. |
+| `config.js`, `firestore.rules` | Configurazione Firebase e regole (dati in `users/{uid}/hiragana/japan`). |
 
-## Modificare e pubblicare
+## Modificare
 
 ```bash
-python3 build.py
+sh app/build.sh                       # ricostruisce app.js
+python3 -m http.server 8765 &         # poi, in un altro terminale:
+node test/e2e.js                      # test completo
 ```
 
-Poi commit e push su `main`: GitHub Pages pubblica da solo (Settings › Pages › Deploy from a branch › `main` / root).
-
-## Firebase (una volta sola)
-
-1. Authentication › Metodo di accesso › Email/password attivo.
-2. Firestore › Crea database, poi incolla `firestore.rules` in Regole e pubblica.
-3. Authentication › Impostazioni › Domini autorizzati: aggiungi `raoulalfredorocher.github.io`.
-4. Impostazioni progetto › Le tue app › Web: copia `firebaseConfig` in `config.js`.
+Salvataggio: righe scelte e impostazioni vanno subito in `localStorage` e subito sull'account; ognuna ha la sua data di modifica,
+quindi uno stato vecchio di un altro dispositivo non le sovrascrive mai.
 
 ## Crediti
 
-Ordine dei tratti: [KanjiVG](https://kanjivg.tagaini.net) di Ulrich Apel, licenza CC BY-SA 3.0 (`src/strokes.json` ne deriva ed è sotto la stessa licenza).
+Tratti: [KanjiVG](https://kanjivg.tagaini.net) di Ulrich Apel, licenza CC BY-SA 3.0 (`app/data/strokes-*.json` ne derivano, stessa licenza).
