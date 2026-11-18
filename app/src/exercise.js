@@ -84,7 +84,7 @@ export function renderExercise(app) {
     <div class="tabs" role="tablist">${Q.modes.map(m => `<button role="tab" data-mode="${m}" aria-selected="${Q.mode === m}">${esc(t(MODE_LABEL[m]))}</button>`).join('')}</div>
     <span class="count" aria-label="${esc(t('ok'))}"><span class="c-ok">✓ ${Q.ok}</span><span class="c-bad">✗ ${Q.n - Q.ok}</span></span></div>`;
   if (!it) {
-    app.innerHTML = head + `<p class="muted center" style="margin-top:12vh">${esc(t('noRows'))}</p>`;
+    app.innerHTML = (sc === 'kanji' ? kanjiHead() : head) + `<p class="muted center" style="margin-top:12vh">${esc(t('noRows'))}</p>`;
     wireHead(app); return;
   }
   const n = it.target ? [...it.target].length : 0;
@@ -101,7 +101,8 @@ export function renderExercise(app) {
   const actions = done ? `${listenBtn}<button class="btn primary grow" id="x-next">${esc(t('next'))} ${IC.next}</button>`
     : Q.phase === 'bad' ? `<button class="btn" id="x-skip">${esc(t('next'))}</button><button class="btn primary grow" id="x-retry">${esc(t('retry'))}</button>`
     : `<button class="btn primary grow" id="x-check">${IC.check} ${esc(t('check'))}</button>`;
-  app.innerHTML = head + `<div class="quiz ${it.pad ? '' : 'nopad'}">
+  if (sc === 'kanji') app.innerHTML = kanjiView(it, done, actions);
+  else app.innerHTML = head + `<div class="quiz ${it.pad ? '' : 'nopad'}">
     <div class="side"><section class="prompt">${big}${ask}${inputs}${reveal}
       ${!done && it.listen && !it.audio ? `<div class="row">${listenBtn}</div>` : ''}${Q.fallback && Q.kind === 'vocab' ? `<div class="muted small">${esc(t('fewWords'))}</div>` : ''}</section></div>
     <div class="fbslot" id="x-fb">${Q.msg ? `<div class="fb ${Q.msg.type}">${Q.msg.lines.map(esc).join('<br>')}</div>` : ''}</div>
@@ -117,10 +118,10 @@ export function renderExercise(app) {
     pad.cellFb = Q.cellFb.slice();
     pad.ghost = Q.ghost ? [...it.target].map((c, i) => (Q.cellFb[i] && Q.cellFb[i].state === 'ok' ? null : c)) : [];
     if (it.labels) pad.labels = [...it.target].map(c => labelFor(c));
-    fitPad(pad, $('#x-padwrap'), 76);
+    if (sc === 'kanji') fitKanji(); else fitPad(pad, $('#x-padwrap'), 76);
     pad.locked = done || Q.phase === 'bad';
     
-  } else pad = null;
+  } else { pad = null; if (sc === 'kanji') fitKanji(); }
   Q.keepStrokes = false;
   const ro = $('#x-ro'), itn = $('#x-it');
   if (ro) ro.oninput = () => (Q.vals.ro = ro.value);
@@ -142,6 +143,47 @@ export function renderExercise(app) {
   const app2 = app;
   Q.rerender = () => renderExercise(app2);
 }
+// ---- Kanji: schermata a tutto schermo (linguette intere, prompt compatto, foglio grande, barra in basso) ----
+const K_ICON = {
+  kwrite: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
+  ksym: '<span class="kti" aria-hidden="true">字</span>',
+  kaudio: IC.sound,
+};
+function kanjiHead() {
+  return `<div class="exbar kj"><button class="icon-btn" id="x-back" aria-label="${esc(t('back'))}">${IC.back}</button>
+    <div class="tabs" role="tablist">${Q.modes.map(m => `<button role="tab" data-mode="${m}" aria-selected="${Q.mode === m}">${K_ICON[m]}<span>${esc(t(MODE_LABEL[m]))}</span></button>`).join('')}</div>
+    <span class="count" aria-label="${esc(t('ok'))}"><span class="c-ok">✓ ${Q.ok}</span><span class="c-bad">✗ ${Q.n - Q.ok}</span></span></div>`;
+}
+function kanjiView(it, done, actions) {
+  const say = `<button class="btn klisten" id="x-say" aria-label="${esc(t('play'))}">${IC.sound}<span>${esc(t('play'))}</span></button>`;
+  const inp = it.needIt ? `<input class="ans" id="x-it" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="${esc(t('italianPh'))}" value="${esc(Q.vals.it)}" ${done ? 'readonly' : ''}>` : '';
+  const reveal = done ? `<div class="reveal"><span class="k">${esc(it.target || it.k)}</span><span>${esc(it.ro)}${it.it ? ' · ' + esc(it.it) : ''}</span></div>` : '';
+  let prompt;
+  if (Q.mode === 'kwrite') prompt = `<section class="kp"><div class="khead"><div class="kmw"><div class="kmean">${esc(it.show)}</div><div class="kask">${esc(t('writeKanji'))}</div></div>${say}</div>${reveal}</section>`;
+  else if (Q.mode === 'ksym') prompt = `<section class="kp kbig"><div class="bigk">${esc(it.showKanji)}</div><div class="krow">${inp}${say}</div>${reveal}</section>`;
+  else prompt = `<section class="kp"><div class="krow"><button class="btn primary klisten" id="x-play" aria-label="${esc(t('play'))}">${IC.play}<span>${esc(t(Q.played ? 'replay' : 'play'))}</span></button>${inp}</div>${reveal}</section>`;
+  const fb = `<div class="fbslot" id="x-fb">${Q.msg ? `<div class="fb ${Q.msg.type}">${Q.msg.lines.map(esc).join('<br>')}</div>` : ''}</div>`;
+  const tools = it.pad && !done && Q.phase !== 'bad' ? `<button class="icon-btn" id="x-clear" aria-label="${esc(t('clearAll'))}">${IC.clear}</button><button class="icon-btn" id="x-undo" aria-label="${esc(t('undo'))}">${IC.undo}</button><button class="icon-btn" id="x-model" aria-label="${esc(t('model'))}">${IC.eye}</button>` : '';
+  const bar = `<div class="kbar">${tools}${actions.replace(/<button class="btn" id="x-say">[\s\S]*?<\/button>/, '')}</div>`;
+  return kanjiHead() + `<div class="kq ${it.pad ? 'haspad' : 'nopad'}" id="x-kq">
+    <div class="kside">${prompt}${fb}</div>
+    ${it.pad ? `<div class="kmain"><div class="kslot" id="x-padwrap"><canvas class="pad" id="x-pad" aria-label="Foglio"></canvas></div>${bar}</div>` : `<div class="kmain">${bar}</div>`}
+  </div>`;
+}
+// il blocco riempie lo schermo fino in fondo; il foglio prende tutto lo spazio rimasto (quadrato)
+function fitKanji() {
+  const kq = $('#x-kq'); if (!kq) return;
+  const appEl = $('#app'), padB = appEl ? parseFloat(getComputedStyle(appEl).paddingBottom) || 0 : 0;
+  kq.style.height = Math.max(380, window.innerHeight - (kq.getBoundingClientRect().top + window.scrollY) - padB) + 'px';
+  if (!pad) return;
+  const slot = $('#x-padwrap');
+  pad.c.style.width = pad.c.style.height = '0px';
+  const side = Math.floor(Math.min(slot.clientWidth, slot.clientHeight, 760));
+  const f = { l: 1, m: 0.7, s: 0.4 }[device.padSize || 'l'] || 1;
+  pad.layout(Math.max(110, Math.floor(side * f)), 1);
+}
+let kResizeT = null;
+window.addEventListener('resize', () => { clearTimeout(kResizeT); kResizeT = setTimeout(() => { if (Q && Q.script === 'kanji' && $('#x-kq')) fitKanji(); }, 120); });
 function wireHead(app) {
   $('#x-back').onclick = () => { stopSpeech(); const g = Q.go, sc = Q.script; if (Q.n) toast(`${Q.ok}/${Q.n} ${t('ok')}`); Q = null; pad = null; g(sc === 'kanji' ? 'kanjiHome' : 'section', { script: sc }); };
   $$('[data-mode]').forEach(b => (b.onclick = () => { if (b.dataset.mode === Q.mode) return; stopSpeech(); Q.mode = b.dataset.mode; setUi(`${Q.script}.${Q.kind}`, Q.mode); Q.played = false; nextItem(); renderExercise(app); }));

@@ -158,6 +158,46 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
 .fbslot:empty{display:none}
 @media (max-width:600px){.hide-phone{display:none}.prompt{padding:14px}}
 
+/* allenamento kanji: tutto lo schermo, linguette sempre intere */
+.exbar.kj{grid-template-columns:44px minmax(0,1fr) auto;gap:8px;margin-bottom:12px}
+.exbar.kj .icon-btn{width:44px;height:44px}
+.exbar.kj .tabs{max-width:540px;padding:3px;gap:3px;border-radius:14px}
+.exbar.kj .tabs button{min-height:44px;padding:0 2px;border-radius:11px;font-size:clamp(.8rem,3.75vw,1rem);display:flex;align-items:center;justify-content:center;gap:7px;overflow:visible;text-overflow:clip}
+.exbar.kj .tabs button>svg,.exbar.kj .tabs .kti{display:none}
+.exbar.kj .tabs .kti{font-family:var(--f-kana);font-size:1.15em;line-height:1;font-weight:600}
+@media (min-width:520px){.exbar.kj .tabs button>svg{display:block;width:19px;height:19px}.exbar.kj .tabs .kti{display:inline}}
+.exbar.kj .count{min-width:34px}
+.kq{display:flex;flex-direction:column;gap:10px;min-height:0}
+.kq .kside{display:flex;flex-direction:column;gap:10px;flex:none;min-width:0}
+.kq .kmain{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.kq .kslot{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.kq .kslot canvas.pad{flex:none}
+.kp{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.kp .khead{display:flex;align-items:center;gap:12px}
+.kp .kmw{flex:1;min-width:0;text-align:left}
+.kp .kmean{font-size:clamp(1.5rem,6.6vw,2.3rem);font-weight:700;line-height:1.1;overflow-wrap:anywhere}
+.kp .kask{color:var(--muted);font-size:.85rem;margin-top:2px}
+.kp .krow{display:flex;gap:8px;align-items:center}
+.kp .krow .ans{flex:1;min-width:0}
+.klisten{min-height:48px;padding:0 14px;flex:none}
+.klisten svg{width:22px;height:22px}
+.kp .reveal{padding-top:8px}
+.kq.nopad .kside{flex:1}.kq.nopad .kmain{flex:none}
+.kq.nopad .kp.kbig{flex:1;justify-content:center}
+.kq .bigk{font-size:clamp(5rem,min(42vw,30vh),16rem)}
+.kbar{display:flex;gap:8px;flex:none}
+.kbar .btn.grow{flex:1;max-width:none;min-height:52px;font-size:1.05rem}
+.kbar .icon-btn{width:52px;height:52px}
+.kbar>.btn:not(.grow){min-height:52px}
+.kq .fb{padding:9px 12px;font-size:.95rem}
+@media (max-height:700px){.kp{padding:10px 12px;gap:8px}.kq .bigk{font-size:clamp(5rem,30vw,9rem)}}
+@media (min-width:860px) and (orientation:landscape){
+  .kq.haspad{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.5fr);gap:16px;align-items:stretch}
+  .kq.haspad .kmain{grid-column:2;grid-row:1}
+  .kq.nopad{max-width:640px;margin:0 auto}
+}
+@media (min-width:700px) and (orientation:portrait){.kq.nopad{max-width:640px;margin:0 auto;width:100%}}
+
 /* scheda kana */
 .sheet-head{display:flex;gap:16px;align-items:center}
 .sheet-head .k{font-family:var(--f-kana);font-size:4.4rem;line-height:1;color:var(--accent)}
@@ -238,7 +278,7 @@ if(cfg&&cfg.apiKey){
   }catch(e){console.warn('Firebase non raggiungibile: si lavora sul dispositivo',e);}
 }
 </script>
-<script src="app.js?v=c79420be"></script>
+<script src="app.js?v=60dd5e2e"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
 </html>
