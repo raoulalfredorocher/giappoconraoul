@@ -2,7 +2,7 @@
 // Riconoscimento vocale del browser (Web Speech API, giapponese): Safari su iPhone/iPad, Chrome/Edge sul computer.
 import { ROWS, WORDS, KANJI, romaji, rowOf } from './data.js';
 import { S, record, pick, setUi } from './store.js';
-import { speak, stopSpeech } from './speech.js';
+import { speak, stopSpeech, setMicMode } from './speech.js';
 import { lang } from './i18n.js';
 import { $, $$, esc, IC, toast } from './ui.js';
 import { matches, addReadings } from './talkmatch.js';
@@ -50,32 +50,60 @@ function score(ok) { if (T.recorded || !T.item) return; T.recorded = true; T.n++
 
 export function startTalk(script, go) {
   const saved = S.ui[`${script}.talk`];
+  enterTalk();
   T = { script, go, mode: script === 'kanji' ? 'kanji' : saved === 'words' ? 'words' : 'letters', recent: [], ok: 0, n: 0 };
   next();
   go('talk');
 }
 
 // ---- microfono ----
-function setSession(t) { try { if (navigator.audioSession) navigator.audioSession.type = t; } catch (e) {} }
-function stopRec() { clearTimeout(timer); if (rec) { const r = rec; rec = null; r.onresult = r.onerror = r.onend = null; try { r.abort(); } catch (e) {} } setSession('playback'); }
-export function leaveTalk() { stopRec(); clearTimeout(advT); }
+// Su Safari (iPhone/iPad) il riconoscimento è fragile: un'istanza nuova per ogni tentativo, si riparte solo
+// dopo che la precedente è davvero chiusa (onend), e la sessione audio resta "registra e suona" per tutta la
+// schermata (passare a "solo suono" tra un tentativo e l'altro spegne il microfono dal secondo in poi).
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function setSession(t) { try { if (navigator.audioSession && navigator.audioSession.type !== t) navigator.audioSession.type = t; } catch (e) {} }
+let closing = Promise.resolve(), pending = false, attempt = 0;
+function closeRec(hard) {
+  clearTimeout(timer);
+  const r = rec; if (!r) return closing;
+  rec = null; r.onresult = r.onerror = r.onaudiostart = r.onspeechstart = null; pending = true;
+  closing = new Promise(res => {
+    let d = false; const f = () => { if (!d) { d = true; pending = false; res(); } };
+    r.onend = f; setTimeout(f, 1500); // se onend non arriva non resta bloccato
+    try { hard ? r.abort() : r.stop(); } catch (e) { f(); }
+  });
+  return closing;
+}
+export function exitTalk() { T = null; leaveTalk(); }
+export function enterTalk() { setMicMode(true); setSession('play-and-record'); }
+export function leaveTalk() { attempt++; clearTimeout(advT); closeRec(true).then(() => { if (T === null) { setMicMode(false); setSession('playback'); } }); }
 
-function startRec(app) {
+async function startRec(app, auto = 0) {
   if (!SR) { T.msg = tt('noSR'); T.state = 'err'; return draw(app); }
-  stopSpeech(); stopRec(); clearTimeout(advT);
-  setSession('play-and-record');
+  const my = ++attempt;
+  stopSpeech(); clearTimeout(advT);
+  T.state = 'listen'; T.msg = ''; if (!auto) T.heard = '';
+  draw(app);
+  enterTalk();
+  // di solito parte subito, dentro il tocco; aspetta solo se il riconoscitore di prima sta ancora chiudendo
+  if (rec || pending || auto) { await closeRec(true); await wait(auto ? 400 : 250); if (my !== attempt || !T) return; }
   const r = new SR(); rec = r;
   r.lang = 'ja-JP'; r.interimResults = true; r.maxAlternatives = 5; r.continuous = false;
-  const item = T.item; let got = false, finished = false;
+  const item = T.item, t0 = Date.now(); let got = false, heardAudio = false, finished = false;
   const alts = [];
   const done = ok => {
-    if (finished) return; finished = true; stopRec();
+    if (finished || my !== attempt) return; finished = true; closeRec(false);
     if (ok) { score(T.tries === 0 && !T.reveal); T.state = 'ok'; draw(app); advT = setTimeout(() => { if (T && T.item === item && view() === 'talk') { next(); draw(app); } }, 1100); return; }
+    // chiuso subito senza aver sentito nulla: riparte da solo una volta, senza dire niente
+    if (!got && !heardAudio && Date.now() - t0 < 1500 && auto < 1) { startRec(app, auto + 1); return; }
     T.tries++; if (T.tries >= 2) T.reveal = true;
     if (got) score(false);
     T.state = 'retry'; T.msg = got ? '' : tt('none'); draw(app);
   };
+  r.onaudiostart = () => { heardAudio = true; };
+  r.onspeechstart = () => { heardAudio = true; };
   r.onresult = e => {
+    if (my !== attempt) return;
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const res = e.results[i];
       for (let j = 0; j < res.length; j++) { const tx = res[j].transcript; if (tx && tx.trim()) { got = true; alts.push(tx); } }
@@ -86,19 +114,18 @@ function startRec(app) {
   };
   r.onerror = e => {
     const c = e && e.error;
-    if (c === 'no-speech' || c === 'aborted') return; // onend chiude
-    finished = true; stopRec();
+    if (c === 'no-speech' || c === 'aborted') return; // decide onend
+    if (my !== attempt || finished) return;
+    finished = true; closeRec(true);
     T.state = 'err';
     T.msg = c === 'not-allowed' || c === 'service-not-allowed'
       ? [tt('denied'), IOS ? (STANDALONE() ? tt('pwa') : tt('dict')) : ''].filter(Boolean).join(' ')
       : c === 'network' ? tt('net') : tt('none');
     draw(app);
   };
-  r.onend = () => { if (!finished) done(matches(item, alts)); };
-  try { r.start(); } catch (e) { finished = true; stopRec(); T.state = 'err'; T.msg = tt('denied'); return draw(app); }
-  T.state = 'listen'; T.heard = ''; T.msg = '';
-  draw(app);
-  timer = setTimeout(() => { try { r.stop(); } catch (e) {} }, 7000);
+  r.onend = () => { if (rec === r) rec = null; done(matches(item, alts)); };
+  try { r.start(); } catch (e) { rec = null; if (auto < 1) return startRec(app, auto + 1); finished = true; T.state = 'err'; T.msg = tt('none'); return draw(app); }
+  timer = setTimeout(() => { if (rec === r) { try { r.stop(); } catch (e) {} } }, 7000);
 }
 
 // ---- schermata ----
@@ -143,9 +170,9 @@ function fit() {
 }
 if (typeof window !== 'undefined') addEventListener('resize', () => { if (T) fit(); });
 function wire(app) {
-  $('#t-back').onclick = () => { leaveTalk(); const g = T.go, sc = T.script; if (T.n) toast(`${T.ok}/${T.n} ✓`); T = null; g(sc === 'kanji' ? 'kanjiHome' : 'section', { script: sc }); };
+  $('#t-back').onclick = () => { const g = T.go, sc = T.script; if (T.n) toast(`${T.ok}/${T.n} ✓`); T = null; leaveTalk(); g(sc === 'kanji' ? 'kanjiHome' : 'section', { script: sc }); };
   $$('[data-tm]').forEach(b => (b.onclick = () => { if (b.dataset.tm === T.mode) return; leaveTalk(); T.mode = b.dataset.tm; setUi(`${T.script}.talk`, T.mode); next(); draw(app); }));
-  const mic = $('#t-mic'); if (mic) mic.onclick = () => { if (T.state === 'listen') { try { rec && rec.stop(); } catch (e) {} return; } if (T.state === 'ok') return; startRec(app); };
+  const mic = $('#t-mic'); if (mic) mic.onclick = () => { if (T.state === 'listen') { if (rec) { try { rec.stop(); } catch (e) {} } return; } if (T.state === 'ok') return; startRec(app); };
   const say = $('#t-say'); if (say) say.onclick = () => { leaveTalk(); if (T.state === 'listen') T.state = 'idle'; T.reveal = true; draw(app); speak(T.item.say); };
   const sk = $('#t-skip'); if (sk) sk.onclick = () => { leaveTalk(); stopSpeech(); if (T.state !== 'ok' && T.tries) score(false); next(); draw(app); };
 }
