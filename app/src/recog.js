@@ -75,16 +75,21 @@ function cloudOf(strokes) {
   const pts = []; strokes.forEach((s, i) => { const r = cnt[i] === 1 ? [s[Math.floor(s.length / 2)]] : resampleStroke(s, cnt[i]); for (const [x, y] of r) pts.push([(x - cx) / sc, (y - cy) / sc]); });
   return pts;
 }
-function cloudRun(a, b, start) {
+// lim: si smette appena la somma lo supera (il risultato serve solo se è più basso)
+function cloudRun(a, b, start, lim = Infinity) {
   const n = a.length, m = b.length, used = new Uint8Array(m); let sum = 0, i = start;
-  for (let k = 0; k < n; k++) { let best = Infinity, bj = -1;
-    for (let j = 0; j < m; j++) { if (used[j]) continue; const d = Math.hypot(a[i][0] - b[j][0], a[i][1] - b[j][1]); if (d < best) { best = d; bj = j; } }
+  for (let k = 0; k < n; k++) { if (sum >= lim) return sum; let best = Infinity, bj = -1;
+    for (let j = 0; j < m; j++) { if (used[j]) continue; const dx = a[i][0] - b[j][0], dy = a[i][1] - b[j][1], d = Math.sqrt(dx * dx + dy * dy); if (d < best) { best = d; bj = j; } }
     if (bj < 0) break; used[bj] = 1; sum += (1 - k / n) * best; i = (i + 1) % n; }
   return sum;
 }
-function cloudDist(a, b) {
-  const n = Math.min(a.length, b.length), step = Math.max(1, Math.floor(Math.sqrt(n))); let best = Infinity;
-  for (let i = 0; i < a.length; i += step) { const d = Math.min(cloudRun(a, b, i), cloudRun(b, a, i % b.length)); if (d < best) best = d; }
+// cap: distanza oltre la quale il valore esatto non serve (con molti kanji il confronto resta veloce)
+function cloudDist(a, b, cap = Infinity) {
+  const n = Math.min(a.length, b.length), step = Math.max(1, Math.floor(Math.sqrt(n))), L = cap * (n * 0.5); let best = Infinity;
+  for (let i = 0; i < a.length; i += step) {
+    let d = cloudRun(a, b, i, Math.min(best, L)); if (d < best) best = d;
+    d = cloudRun(b, a, i % b.length, Math.min(best, L)); if (d < best) best = d;
+  }
   return best / (n * 0.5);
 }
 const CLOUD = {};
@@ -118,7 +123,7 @@ export function check(userStrokes, target, { level = 'easy', candidates = [], la
   const uc = cloudOf(U);
   const dT = cloudDist(uc, tplCloud(target));
   let best = null;
-  for (const c of candidates) { if (eqv(c, target) || !SD[c]) continue; const d = cloudDist(uc, tplCloud(c)); if (!best || d < best.d) best = { c, d }; }
+  for (const c of candidates) { if (eqv(c, target) || !SD[c]) continue; const d = cloudDist(uc, tplCloud(c), best ? best.d : Infinity); if (!best || d < best.d) best = { c, d }; }
   const cloudPass = dT < L.abs && (!best || dT <= best.d * L.ratio);
   let strokePass = false;
   if (nU === nT && nT <= 8) strokePass = strokesMatch(U, T.raw, 0.19);
