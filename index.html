@@ -97,6 +97,11 @@ svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-l
 
 /* alfabeto */
 .selbar{margin:-4px 0 4px}
+.savebar{margin:6px 0 10px;display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.savebar .btn{min-height:50px;font-size:1.02rem}
+.saved{font-size:.92rem;text-align:center;min-height:1.2em}
+.saved.ok{color:var(--ok,#2e7d4f)}
+.saved.bad{color:var(--bad,#c0392b)}
 .sec{margin:20px 0 8px}.sec h2{font-size:.95rem;color:var(--muted);font-weight:600}
 .arow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .pick{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:50%}
@@ -212,12 +217,12 @@ if(cfg&&cfg.apiKey){
       if(u){const ref=F.doc(db,'users',u.uid,'hiragana','japan');
         window.JCA_SYNC={get:async()=>{const s=await F.getDoc(ref);return s.exists()?s.data():null;},set:d=>F.setDoc(ref,d)};
         box.hidden=true;dispatchEvent(new Event('jca-sync-ready'));}
-      else{window.JCA_SYNC=null;dispatchEvent(new Event('jca-signed-out'));let skip=false;try{skip=!!(localStorage.getItem('jca-skip-login')||localStorage.getItem('hira-skip-login'));}catch(e){}box.hidden=skip;}
+      else{window.JCA_SYNC=null;dispatchEvent(new Event('jca-signed-out'));let skip=false;try{skip=!!localStorage.getItem('jca-skip-login');}catch(e){}box.hidden=skip;}
     });
   }catch(e){console.warn('Firebase non raggiungibile: si lavora sul dispositivo',e);}
 }
 </script>
-<script src="app.js?v=a894995a"></script>
+<script src="app.js?v=c1f7f86a"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
 </html>

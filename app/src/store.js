@@ -112,6 +112,25 @@ export async function pull() {
     if (changedLocal) listeners.forEach(f => f());
   } catch (e) { sync.state = 'err'; }
 }
+// "Salva alfabeto": scrive e RILEGGE (dispositivo e account) per dare una conferma vera
+export async function saveNow() {
+  S.updatedAt = Date.now();
+  let local = false;
+  try { writeLocal(); const back = JSON.parse(localStorage.getItem(KEY) || 'null'); local = !!back && JSON.stringify(back.sel) === JSON.stringify(S.sel); } catch (e) {}
+  let remote = null;
+  if (DB) {
+    clearTimeout(pushTimer); pushTimer = null;
+    try {
+      await DB.set({ json: JSON.stringify(S), updatedAt: S.updatedAt });
+      const d = await DB.get();
+      remote = !!(d && d.json) && JSON.stringify(migrate(JSON.parse(d.json)).sel) === JSON.stringify(S.sel);
+      sync.state = remote ? 'ok' : 'err';
+    } catch (e) { remote = false; sync.state = 'err'; }
+  }
+  return { local, remote };
+}
+// chiede al browser di non cancellare i dati dell'app
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 export function connect(db) { DB = db; return pull(); }
 export function disconnect() { DB = null; sync.state = 'local'; }
 export function connected() { return !!DB; }
