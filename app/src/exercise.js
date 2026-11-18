@@ -64,7 +64,7 @@ function nextItem() {
   const p = pick(pool, keyStat, Q.recent.slice(-Math.min(4, pool.length - 1)));
   Q.recent.push(keyStat(p)); if (Q.recent.length > 8) Q.recent.shift();
   Q.item = makeItem(Q, p); Q.statKey = keyStat(p);
-  Q.phase = 'draw'; Q.miss = false; Q.recorded = false; Q.msg = null; Q.cellFb = []; Q.ghost = false; Q.vals = { ro: '', it: '' }; Q.res = null;
+  Q.phase = 'draw'; Q.order = 1; Q.miss = false; Q.recorded = false; Q.msg = null; Q.cellFb = []; Q.ghost = false; Q.vals = { ro: '', it: '' }; Q.res = null;
 }
 
 export function startExercise(script, kind, go) {
@@ -113,7 +113,7 @@ export function renderExercise(app) {
   if (it.pad) {
     const prev = pad && pad.n === n && Q.keepStrokes ? pad.strokes : null;
     pad = new Pad($('#x-pad'), n, { onPen: () => toast(t('penFound')) });
-    if (prev) pad.strokes = prev;
+    if (prev) { pad.strokes = prev; if (Q.order) pad.order = Q.order; }
     pad.cellFb = Q.cellFb.slice();
     pad.ghost = Q.ghost ? [...it.target].map((c, i) => (Q.cellFb[i] && Q.cellFb[i].state === 'ok' ? null : c)) : [];
     if (it.labels) pad.labels = [...it.target].map(c => labelFor(c));
@@ -132,7 +132,7 @@ export function renderExercise(app) {
   const bn = $('#x-next'); if (bn) bn.onclick = () => { stopSpeech(); Q.played = false; nextItem(); renderExercise(app); };
   const bs = $('#x-skip'); if (bs) bs.onclick = () => { finish(false); renderExercise(app); };
   const br = $('#x-retry'); if (br) br.onclick = () => { Q.phase = 'draw'; Q.msg = null; if (pad) { pad.clearBad(); Q.cellFb = pad.cellFb.slice(); Q.keepStrokes = true; } renderExercise(app); };
-  const cl = $('#x-clear'); if (cl) cl.onclick = () => { pad.strokes = pad.strokes.filter(s => { const f = Q.cellFb[pad.cellOf(s)]; return f && f.state === 'ok'; }); pad.draw();  };
+  const cl = $('#x-clear'); if (cl) cl.onclick = () => { if (pad.free) { pad.clear(); Q.cellFb = []; return; } pad.strokes = pad.strokes.filter(s => { const f = Q.cellFb[pad.cellOf(s)]; return f && f.state === 'ok'; }); pad.draw();  };
   const ud = $('#x-undo'); if (ud) ud.onclick = () => { pad.undo();  };
   const md = $('#x-model'); if (md) md.onclick = () => {
     Q.miss = true;
@@ -178,17 +178,23 @@ function doCheck() {
     const chars = [...it.target];
     // in "audio" valgono anche i kana con lo stesso suono (じ/ぢ, ず/づ, お/を) e, per i kanji, quelli con la stessa lettura
     const variants = it.audio ? (Q.script === 'kanji' ? KANJI.filter(k => k.yomi === it.yomi).map(k => [k.k]) : homophones(it.target).map(v => [...v])) : [chars];
-    const cf = [];
+    const run = groups => { const cf = [], lines = [], tips = []; let allOk = true, nOk = 0;
     chars.forEach((c, i) => {
       if (Q.cellFb[i] && Q.cellFb[i].state === 'ok') { cf[i] = Q.cellFb[i]; return; }
       const g = groups[i];
       if (!g.length) { cf[i] = { ch: c, state: 'bad', showTpl: true }; lines.push(cellLine(i, chars.length, c, t('cellMissing'))); allOk = false; return; }
       let r = null, used = c;
       for (const v of variants) { const cc = v[i] || c; if (!hasTpl(cc)) continue; const rr = check(g, cc, { level: S.settings.level, candidates: candidates(Q.script), lang: lang(), ro: roOf }); if (!r || rr.ok) { r = rr; used = cc; } if (rr.ok) break; }
-      if (r.ok) { cf[i] = { ch: used, state: 'ok', hl: r.tips && r.tips.length ? r.hl : null }; if (r.tips && r.tips.length) tips.push(cellLine(i, chars.length, used, r.tips[0])); }
+      if (r.ok) { nOk++; cf[i] = { ch: used, state: 'ok', hl: r.tips && r.tips.length ? r.hl : null }; if (r.tips && r.tips.length) tips.push(cellLine(i, chars.length, used, r.tips[0])); }
       else { cf[i] = { ch: c, state: 'bad', showTpl: true, hl: r.hl }; lines.push(cellLine(i, chars.length, c, r.msg)); allOk = false; }
     });
-    Q.cellFb = cf; pad.cellFb = cf.slice(); pad.locked = false;
+    return { cf, lines, tips, allOk, nOk }; };
+    // parola libera: vale sia scritta da sinistra a destra sia da destra a sinistra
+    let best;
+    if (pad.free) { const [gf, gr] = pad.groupsBoth(); const a = run(gf); const b = a.allOk ? null : run(gr); best = b && b.nOk > a.nOk ? b : a; pad.order = best === a ? 1 : -1; pad._seg = null; }
+    else best = run(groups);
+    const cf = best.cf; lines.push(...best.lines); tips.push(...best.tips); if (!best.allOk) allOk = false;
+    Q.cellFb = cf; Q.order = pad.order; pad.cellFb = cf.slice(); pad.locked = false;
   }
   if (it.needRo) { if (!romajiOk(Q.vals.ro, it.ro)) { allOk = false; lines.push(Q.vals.ro.trim() ? t('wrongRomaji', it.ro) : t('missingRomaji')); } }
   if (it.needIt) { if (!meaningOk(Q.vals.it, it.it)) { allOk = false; lines.push(Q.vals.it.trim() ? t('wrongIt', it.it) : t('missingIt')); } }
