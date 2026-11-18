@@ -1,6 +1,6 @@
 // Schermate: Home, sezioni, Alfabeto, scheda del kana/kanji, Kanji, Impostazioni, sezioni in arrivo.
 import { ROWS, WORDS, KANJI, RO, romaji } from './data.js';
-import { S, device, saveDevice, setRows, setSetting, connected, resetAll } from './store.js';
+import { S, device, saveDevice, setRows, setSetting, connected, resetAll, saveNow } from './store.js';
 import { tpl, check } from './recog.js';
 import { Pad, fitPad } from './pad.js';
 import { speak, stopSpeech } from './speech.js';
@@ -10,7 +10,10 @@ import { startExercise, renderExercise } from './exercise.js';
 
 export let view = { name: 'home' };
 let pad = null;
-export function go(name, args = {}) { stopSpeech(); if (pad) pad.stopAnim(); view = { name, ...args }; render(); window.scrollTo(0, 0); }
+export function go(name, args = {}) {
+  // Impostazioni: ricorda da dove arrivo, Indietro ci riporta lì
+  if (name === 'settings' && view.name !== 'settings') args = { ...args, ret: { ...view } };
+  stopSpeech(); if (pad) pad.stopAnim(); view = { name, ...args }; render(); window.scrollTo(0, 0); }
 // Header uguale in tutte le schermate: logo (torna alla Home) e rotellina delle impostazioni
 function header() {
   const root = $('#app');
@@ -81,6 +84,7 @@ function alpha(app) {
     `${pdfAvail[sc] ? `<a class="btn" href="${PDF[sc]}" target="_blank" rel="noopener">${IC.doc}${esc(t('pdf'))}</a>` : ''}`)}
     <div class="row selbar"><span class="muted small" style="flex:1">${esc(t('alphaSub'))}</span>
       <button class="linkbtn" id="a-all">${esc(t('all'))}</button><button class="linkbtn" id="a-none">${esc(t('none'))}</button></div>
+    <div class="savebar"><button class="btn primary" id="a-save">${IC.check}${esc(t('saveAlpha'))}</button><div class="saved" id="a-saved" role="status" aria-live="polite"></div></div>
     ${group(t('base'), rows.filter(r => !r.d && !r.y))}
     ${group(t('dakuten'), rows.filter(r => r.d))}
     ${group(t('yoon'), rows.filter(r => r.y))}
@@ -92,6 +96,19 @@ function alpha(app) {
     setRows(sc, rows.map(r => r.id).filter(x => cur.has(x)));
     const on = cur.has(id); b.setAttribute('aria-checked', on); b.parentElement.classList.toggle('on', on);
   }));
+  $('#a-save').onclick = async () => {
+    const out = $('#a-saved'), b = $('#a-save'); b.disabled = true; out.className = 'saved'; out.textContent = '…';
+    const r = await saveNow(), n = S.sel[sc].rows.length;
+    b.disabled = false;
+    if (!r.local && !r.remote) { out.className = 'saved bad'; out.textContent = t('saveErr'); return; }
+    if (r.remote === true) { out.className = 'saved ok'; out.textContent = '✓ ' + t('savedAcc', n); return; }
+    out.className = 'saved ' + (r.remote === false ? 'bad' : 'ok');
+    out.textContent = '✓ ' + (r.remote === false ? t('saveAccErr', n) : t('savedLocal', n));
+    if (r.remote === null && window.JCA_AUTH) {
+      const l = document.createElement('button'); l.className = 'linkbtn'; l.textContent = t('saveLogin');
+      l.onclick = () => window.JCA_AUTH.show(); out.append(' ', l);
+    }
+  };
   $('#a-all').onclick = () => { setRows(sc, rows.map(r => r.id)); render(); };
   $('#a-none').onclick = () => { setRows(sc, []); render(); };
   $$('[data-ch]').forEach(b => (b.onclick = () => {
@@ -197,7 +214,7 @@ function settings(app) {
     ${li(t('sReset'), t('sResetSub'), `<button class="btn" id="s-reset">${esc(view.confirm ? t('resetSure') : t('reset'))}</button>`)}
   </div>
   <p class="muted small center" style="margin-top:14px">v__VER__ · VOICEVOX:No.7</p></div>`;
-  wireBack(['home']);
+  { const r = view.ret || { name: 'home' }; $('#b-back').onclick = () => { const { name, ...a } = r; go(name, a); }; }
   $$('[data-k]').forEach(b => (b.onclick = () => {
     const k = b.dataset.k, v = b.dataset.v;
     if (k === 'pad') { device.padSize = v; saveDevice(); }

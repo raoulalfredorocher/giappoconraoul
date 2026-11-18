@@ -133,6 +133,52 @@ async function exerciseRound(page, label, { wrong = false } = {}) {
   ok((await A.page.evaluate(() => window.JCA.S().sel.kata.rows)).includes('ta'), 'il primo dispositivo non perde la riga dopo la sincronizzazione');
   await A.ctx.close(); await B.ctx.close();
 
+  console.log('3b. Caso reale: dati della vecchia app (fino a さ), scelgo fino a は, Salva, riavvio');
+  {
+    const ORIG = new URL(URL0).origin;
+    let D = await newDevice(browser, { storage: { cookies: [], origins: [{ origin: ORIG, localStorage: [{ name: 'hiragana-mano-v1', value: JSON.stringify({ unlocked: 3 }) }, { name: 'hira-skip-login', value: '1' }] }] } });
+    await D.page.goto(URL0); await sleep(300);
+    ok(JSON.stringify(await D.page.evaluate(() => window.JCA.S().sel.hira.rows)) === '["a","ka","sa"]', 'partenza dalla vecchia app: あ か さ');
+    await tap(D.page, '#h-hira'); await tap(D.page, '#s-alpha'); await tap(D.page, '[data-row="ta"]'); await tap(D.page, '[data-row="na"]'); await tap(D.page, '[data-row="ha"]');
+    await tap(D.page, '#a-save'); await sleep(300);
+    const msg = await D.page.textContent('#a-saved');
+    ok(/✓/.test(msg) && /6 righe/.test(msg), 'Salva alfabeto conferma: ' + msg.trim().slice(0, 60));
+    const want = '["a","ka","sa","ta","na","ha"]';
+    for (let i = 1; i <= 3; i++) {
+      const st = await D.ctx.storageState(); await D.ctx.close();
+      D = await newDevice(browser, { storage: st }); await D.page.goto(URL0); await sleep(300);
+      const r = JSON.stringify(await D.page.evaluate(() => window.JCA.S().sel.hira.rows));
+      ok(r === want, `riavvio ${i}: righe fino a は (${r})`);
+    }
+    await tap(D.page, '#h-hira'); await tap(D.page, '#s-alpha');
+    ok(await D.page.getAttribute('[data-row="ha"]', 'aria-checked') === 'true' && await D.page.getAttribute('[data-row="ma"]', 'aria-checked') === 'false', 'schermata: は selezionata, ま no');
+    await D.page.screenshot({ path: `${SHOTS}/02b-salva.png`, fullPage: true });
+    await D.ctx.close();
+    // con account: Salva conferma anche l'account e un nuovo dispositivo vede fino a は
+    const E1 = await newDevice(browser, { signed: true }); await E1.page.goto(URL0); await sleep(400);
+    await tap(E1.page, '#h-hira'); await tap(E1.page, '#s-alpha'); await tap(E1.page, '#a-none');
+    for (const r of ['a', 'ka', 'sa', 'ta', 'na', 'ha']) await tap(E1.page, `[data-row="${r}"]`);
+    await tap(E1.page, '#a-save'); await sleep(400);
+    ok(/account/.test(await E1.page.textContent('#a-saved')), 'con account: conferma salvataggio sull’account');
+    const E2 = await newDevice(browser, { signed: true, viewport: { width: 390, height: 844 }, storage: { cookies: [], origins: [{ origin: ORIG, localStorage: [{ name: 'hiragana-mano-v1', value: JSON.stringify({ unlocked: 3 }) }] }] } });
+    await E2.page.goto(URL0); await sleep(600);
+    const r2 = JSON.stringify(await E2.page.evaluate(() => window.JCA.S().sel.hira.rows));
+    ok(r2 === want, 'iPhone con vecchi dati (fino a さ) + account: vede fino a は (' + r2 + ')');
+    await E1.ctx.close(); await E2.ctx.close();
+  }
+
+  console.log('3c. Indietro: dalle Impostazioni torna alla pagina di prima; il sole porta alla Home');
+  {
+    const N = await newDevice(browser); await N.page.goto(URL0); await sleep(300);
+    await tap(N.page, '#h-hira'); await tap(N.page, '#b-set'); await tap(N.page, '#b-back');
+    ok(await N.page.evaluate(() => window.JCA.view().name + ':' + window.JCA.view().script) === 'section:hira', 'Hiragana › Impostazioni › Indietro = Hiragana');
+    await tap(N.page, '#s-alpha'); await tap(N.page, '#b-set'); await tap(N.page, '#b-back');
+    ok(await N.page.evaluate(() => window.JCA.view().name) === 'alpha', 'Alfabeto › Impostazioni › Indietro = Alfabeto');
+    await tap(N.page, '#b-home');
+    ok(await N.page.evaluate(() => window.JCA.view().name) === 'home', 'il sole rosso porta alla Home');
+    await N.ctx.close();
+  }
+
   console.log('4. Hiragana › Allenamento (tocco)');
   ({ ctx, page } = await newDevice(browser));
   await page.goto(URL0); await sleep(300);
