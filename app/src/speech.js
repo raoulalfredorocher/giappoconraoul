@@ -22,11 +22,13 @@ const HAVE = new Set(IDX.split(' '));
 export const audioFor = text => { const h = fnv(voiceKey(text)); return HAVE.has(h) ? `audio/${h}${slow() ? '-s' : ''}.mp3` : null; };
 
 // Un solo elemento audio, riusato: su iPhone/iPad dopo il primo tocco può ripartire anche dai timer (ripetizioni)
-let el = null;
+let el = null, micMode = false;
+// Parla: mentre il microfono è in uso la sessione audio resta "registra e suona"
+export function setMicMode(v) { micMode = v; }
 function player() {
   if (!el) {
     el = new Audio(); el.preload = 'auto'; el.setAttribute('playsinline', '');
-    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {} // suona anche col silenzioso
+    try { if (navigator.audioSession && !micMode) navigator.audioSession.type = 'playback'; } catch (e) {} // suona anche col silenzioso
   }
   return el;
 }

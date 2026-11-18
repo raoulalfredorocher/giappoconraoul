@@ -7,14 +7,14 @@ import { speak, stopSpeech } from './speech.js';
 import { t, lang } from './i18n.js';
 import { $, $$, esc, IC, toast, logo } from './ui.js';
 import { startExercise, renderExercise } from './exercise.js';
-import { startTalk, renderTalk, leaveTalk, tt } from './talk.js';
+import { startTalk, renderTalk, leaveTalk, exitTalk, tt } from './talk.js';
 
 export let view = { name: 'home' };
 let pad = null;
 export function go(name, args = {}) {
   // Impostazioni: ricorda da dove arrivo, Indietro ci riporta lì
   if (name === 'settings' && view.name !== 'settings') args = { ...args, ret: { ...view } };
-  stopSpeech(); leaveTalk(); if (pad) pad.stopAnim(); view = { name, ...args }; render(); window.scrollTo(0, 0); }
+  stopSpeech(); if (name === 'talk') leaveTalk(); else exitTalk(); if (pad) pad.stopAnim(); view = { name, ...args }; render(); window.scrollTo(0, 0); }
 // Header uguale in tutte le schermate: logo (torna alla Home) e rotellina delle impostazioni
 function header() {
   const root = $('#app');
