@@ -8,7 +8,7 @@ export const DEFAULT_ROWS = { hira: ['a', 'ka'], kata: ['a', 'ka'] };
 function fresh() {
   return {
     v: 1, updatedAt: 0,
-    settings: { theme: 'auto', lang: 'it', level: 'easy', hints: 'auto', rate: 'normal', t: 0 },
+    settings: { theme: 'light', lang: 'it', level: 'easy', hints: 'auto', rate: 'normal', t: 0 },
     sel: { hira: { rows: DEFAULT_ROWS.hira.slice(), t: 0 }, kata: { rows: DEFAULT_ROWS.kata.slice(), t: 0 } },
     ui: { t: 0 },
     stats: {},
@@ -19,6 +19,7 @@ function migrate(s) {
   if (!s || typeof s !== 'object') return f;
   s = { ...f, ...s };
   s.settings = { ...f.settings, ...(s.settings || {}) };
+  if (s.settings.theme === 'auto') s.settings.theme = 'light'; // tema chiaro di default (18/11)
   s.sel = { ...f.sel, ...(s.sel || {}) };
   for (const k of ['hira', 'kata']) if (!s.sel[k] || !Array.isArray(s.sel[k].rows)) s.sel[k] = f.sel[k];
   s.ui = { ...f.ui, ...(s.ui || {}) };

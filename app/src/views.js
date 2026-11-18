@@ -203,7 +203,7 @@ function settings(app) {
   const A = window.JCA_AUTH;
   app.innerHTML = `<div class="narrow">${top(esc(t('settings')))}
   <div class="list">
-    ${li(t('sTheme'), '', seg('theme', [['auto', t('themeAuto')], ['light', t('themeLight')], ['dark', t('themeDark')]], st.theme))}
+    ${li(t('sTheme'), '', seg('theme', [['light', t('themeLight')], ['dark', t('themeDark')]], st.theme))}
     ${li(t('sLang'), '', seg('lang', [['it', 'Italiano'], ['ja', '日本語']], st.lang))}
     ${li(t('sLevel'), t('sLevelSub'), seg('level', [['easy', t('easy')], ['normal', t('normal')]], st.level))}
     ${li(t('sPad'), t('sPadSub'), seg('pad', [['l', t('big')], ['m', t('mid')], ['s', t('small')]], device.padSize || 'l'))}

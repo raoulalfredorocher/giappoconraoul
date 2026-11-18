@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -181,7 +181,7 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
 .login input{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 14px;font:inherit;font-size:1rem;margin-top:10px}
 .login .btn{width:100%;margin-top:12px}
 .login .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px;font-weight:600}
-.login .or{display:flex;align-items:center;gap:10px;color:var(--muted,#888);font-size:.85rem;margin:16px 0 0}.login .or:before,.login .or:after{content:"";flex:1;border-top:1px solid var(--line)}
+.login .gbtn svg{background:#fff;border-radius:50%;padding:4px;box-sizing:content-box}
 .login .err{color:var(--bad);font-size:.9rem;margin-top:10px}.login .err:empty{display:none}
 </style>
 </head>
@@ -192,13 +192,8 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
     <div class="sun" aria-hidden="true"></div>
     <h1>ジャパン・コン・アルフレード</h1>
     <p class="muted small">Progressi uguali su tutti i dispositivi.</p>
-    <button class="btn gbtn" type="button" id="login-google"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.2l7.8 6.1C12.3 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.3.8-4.7l-7.8-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Accedi con Google</button>
-    <div class="or"><span>oppure</span></div>
-    <input id="login-email" type="email" autocomplete="username" placeholder="Email" aria-label="Email" required>
-    <input id="login-pass" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" minlength="6" required>
+    <button class="btn primary gbtn" type="button" id="login-google"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.2l7.8 6.1C12.3 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.3.8-4.7l-7.8-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Accedi con Google</button>
     <div class="err" id="login-err" role="alert"></div>
-    <button class="btn primary" type="submit">Accedi</button>
-    <button class="btn" type="button" id="login-new">Crea l'account</button>
     <button class="linkbtn" type="button" id="login-skip" style="margin-top:14px">Continua senza account</button>
   </form>
 </div>
@@ -213,8 +208,6 @@ if(cfg&&cfg.apiKey){
     const [{initializeApp},A,F]=await Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]);
     const app=initializeApp(cfg),auth=A.getAuth(app),db=F.getFirestore(app);
     const MSG={'auth/invalid-credential':'Email o password sbagliate.','auth/wrong-password':'Password sbagliata.','auth/user-not-found':'Nessun account con questa email.','auth/email-already-in-use':'Esiste già un account con questa email: usa Accedi.','auth/weak-password':'Password troppo corta: almeno 6 caratteri.','auth/invalid-email':'Email non valida.','auth/network-request-failed':'Sei senza rete. Riprova, o continua senza account.','auth/too-many-requests':'Troppi tentativi. Riprova tra qualche minuto.'};
-    const run=async fn=>{err.textContent='';const e=$('login-email').value.trim(),p=$('login-pass').value;if(!e||p.length<6){err.textContent='Scrivi email e password (almeno 6 caratteri).';return;}
-      try{await fn(auth,e,p);}catch(x){err.textContent=MSG[x.code]||'Non riuscito ('+(x.code||'errore')+').';}};
     // Google: popup (iPhone, iPad, computer); se il popup è bloccato, pagina di accesso a schermo intero.
     const GMSG={'auth/operation-not-allowed':'Accesso con Google non ancora attivo.','auth/unauthorized-domain':'Accesso con Google non ancora attivo per questo sito.','auth/network-request-failed':MSG['auth/network-request-failed']};
     const gErr=x=>{if(['auth/popup-closed-by-user','auth/cancelled-popup-request','auth/user-cancelled'].includes(x.code))return;err.textContent=GMSG[x.code]||MSG[x.code]||'Non riuscito ('+(x.code||'errore')+').';};
@@ -223,8 +216,7 @@ if(cfg&&cfg.apiKey){
         if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/web-storage-unsupported'].includes(x.code)){try{await A.signInWithRedirect(auth,g);}catch(y){gErr(y);}}
         else gErr(x);}};
     A.getRedirectResult(auth).catch(gErr);
-    $('login-form').onsubmit=e=>{e.preventDefault();run(A.signInWithEmailAndPassword);};
-    $('login-new').onclick=()=>run(A.createUserWithEmailAndPassword);
+    $('login-form').onsubmit=e=>e.preventDefault();
     $('login-skip').onclick=()=>{try{localStorage.setItem('jca-skip-login','1');}catch(e){}box.hidden=true;};
     window.JCA_AUTH={email:null,show:()=>{box.hidden=false;},signOut:()=>A.signOut(auth)};
     A.onAuthStateChanged(auth,u=>{
@@ -237,7 +229,7 @@ if(cfg&&cfg.apiKey){
   }catch(e){console.warn('Firebase non raggiungibile: si lavora sul dispositivo',e);}
 }
 </script>
-<script src="app.js?v=38ed3c28"></script>
+<script src="app.js?v=6f9e92ab"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
 </html>
