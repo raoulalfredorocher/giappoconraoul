@@ -213,13 +213,8 @@ function settings(app) {
     ${A ? li(t('sAccount'), A.email ? t('signedAs', A.email) : t('notSigned'), `<button class="btn" id="s-acc">${esc(A.email ? t('signOut') : t('signIn'))}</button>`) : ''}
     ${li(t('sReset'), t('sResetSub'), `<button class="btn" id="s-reset">${esc(view.confirm ? t('resetSure') : t('reset'))}</button>`)}
   </div>
-<<<<<<< HEAD
-  <p class="muted small center" style="margin-top:14px">v__VER__</p></div>`;
-  { const r = view.ret || { name: 'home' }; $('#b-back').onclick = () => { const { name, ...a } = r; go(name, a); }; }
-=======
   <p class="muted small center" style="margin-top:14px">v__VER__ · VOICEVOX:No.7</p></div>`;
-  wireBack(['home']);
->>>>>>> origin/main
+  { const r = view.ret || { name: 'home' }; $('#b-back').onclick = () => { const { name, ...a } = r; go(name, a); }; }
   $$('[data-k]').forEach(b => (b.onclick = () => {
     const k = b.dataset.k, v = b.dataset.v;
     if (k === 'pad') { device.padSize = v; saveDevice(); }
