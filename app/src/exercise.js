@@ -80,9 +80,9 @@ export function exItem() { return Q && Q.item; }
 // ---- schermata ----
 export function renderExercise(app) {
   const it = Q.item, sc = Q.script;
-  const head = `<div class="topbar"><button class="icon-btn" id="x-back" aria-label="${esc(t('close'))}">${IC.close}</button>
-    <div class="seg" role="tablist">${Q.modes.map(m => `<button role="tab" data-mode="${m}" aria-pressed="${Q.mode === m}">${esc(t(MODE_LABEL[m]))}</button>`).join('')}</div>
-    <span class="spacer"></span><span class="count">${Q.ok}/${Q.n}</span></div>`;
+  const head = `<div class="exbar"><button class="icon-btn" id="x-back" aria-label="${esc(t('back'))}">${IC.back}</button>
+    <div class="tabs" role="tablist">${Q.modes.map(m => `<button role="tab" data-mode="${m}" aria-selected="${Q.mode === m}">${esc(t(MODE_LABEL[m]))}</button>`).join('')}</div>
+    <span class="count" aria-label="${esc(t('ok'))}"><span class="c-ok">✓ ${Q.ok}</span><span class="c-bad">✗ ${Q.n - Q.ok}</span></span></div>`;
   if (!it) {
     app.innerHTML = head + `<p class="muted center" style="margin-top:12vh">${esc(t('noRows'))}</p>`;
     wireHead(app); return;
@@ -97,7 +97,7 @@ export function renderExercise(app) {
   const inputs = `${it.needRo ? `<input class="ans" id="x-ro" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="latin" placeholder="${esc(t('romajiPh'))}" value="${esc(Q.vals.ro)}" ${done ? 'readonly' : ''}>` : ''}
     ${it.needIt ? `<input class="ans" id="x-it" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('italianPh'))}" value="${esc(Q.vals.it)}" ${done ? 'readonly' : ''}>` : ''}`;
   const reveal = showAnswer && done ? `<div class="reveal">${it.target || it.k ? `<span class="k">${esc(it.target || it.k)}</span>` : ''}<span>${esc(it.ro)}${it.it ? ' · ' + esc(it.it) : ''}</span></div>` : '';
-  const listenBtn = it.listen || (done && it.say) ? `<button class="btn" id="x-say">${IC.sound}${esc(t('listen3'))}</button>` : '';
+  const listenBtn = it.listen || (done && it.say) ? `<button class="btn" id="x-say">${IC.sound}${esc(t('play'))}</button>` : '';
   const actions = done ? `${listenBtn}<button class="btn primary grow" id="x-next">${esc(t('next'))} ${IC.next}</button>`
     : Q.phase === 'bad' ? `<button class="btn" id="x-skip">${esc(t('next'))}</button><button class="btn primary grow" id="x-retry">${esc(t('retry'))}</button>`
     : `<button class="btn primary grow" id="x-check">${IC.check} ${esc(t('check'))}</button>`;
@@ -127,7 +127,7 @@ export function renderExercise(app) {
   if (itn) itn.oninput = () => (Q.vals.it = itn.value);
   [ro, itn].forEach(el => el && (el.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const b = $('#x-check') || $('#x-next') || $('#x-retry'); b && b.click(); } }));
   const play = $('#x-play'); if (play) play.onclick = () => { Q.played = true; speak(it.say, 3); play.querySelector('span').textContent = t('replay'); };
-  const say = $('#x-say'); if (say) say.onclick = () => speak(it.say, 3);
+  const say = $('#x-say'); if (say) say.onclick = () => speak(it.say, 1);
   const bc = $('#x-check'); if (bc) bc.onclick = doCheck;
   const bn = $('#x-next'); if (bn) bn.onclick = () => { stopSpeech(); Q.played = false; nextItem(); renderExercise(app); };
   const bs = $('#x-skip'); if (bs) bs.onclick = () => { finish(false); renderExercise(app); };

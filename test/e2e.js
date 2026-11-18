@@ -137,12 +137,16 @@ async function exerciseRound(page, label, { wrong = false } = {}) {
   await tap(page, '#s-train'); await sleep(200);
   await page.screenshot({ path: `${SHOTS}/03-lettere.png` });
   for (let i = 0; i < 14; i++) await exerciseRound(page, 'Lettere');
+  { const c = (await page.textContent('.exbar .count')).replace(/\s+/g, ' ').trim(); ok(c.replace(/ /g, '') === '✓14✗0', 'contatore dopo 14 giuste: ' + c); }
+  ok(!!(await page.$('#hdr .logo')) && !!(await page.$('#hdr #b-set')), 'header con logo e impostazioni anche negli esercizi');
   // sbagliato di proposito: scrivo un altro kana
   { const it = await item(page); const other = it.target === 'の' ? 'あ' : 'の'; await drawChar(page, other); await tap(page, '#x-check'); await sleep(100);
     const fb = await fbText(page); ok(/fb bad/.test(fb) && page.errors.length === 0, `kana sbagliato riconosciuto (${other} invece di ${it.target}): ${fb.slice(0, 80)}`);
     await page.screenshot({ path: `${SHOTS}/04-errore.png` });
     await tap(page, '#x-retry'); await drawWord(page, it.target); await tap(page, '#x-check'); await sleep(100);
-    ok(/fb (ok|tip)/.test(await fbText(page)), 'Riprova poi giusto'); await tap(page, '#x-next'); }
+    ok(/fb (ok|tip)/.test(await fbText(page)), 'Riprova poi giusto');
+    { const c = (await page.textContent('.exbar .count')).replace(/\s+/g, ' ').trim(); ok(c.replace(/ /g, '') === '✓14✗1', 'contatore dopo un errore: ' + c); }
+    await tap(page, '#x-next'); }
   await tap(page, '[data-mode="audio"]'); await sleep(100);
   await page.screenshot({ path: `${SHOTS}/05-audio.png` });
   for (let i = 0; i < 8; i++) await exerciseRound(page, 'Audio');

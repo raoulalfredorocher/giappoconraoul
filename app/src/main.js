@@ -10,6 +10,7 @@ onRemoteChange(() => { applyTheme(); if (view.name !== 'ex' && view.name !== 'sh
 addEventListener('jca-sync-ready', () => { if (window.JCA_SYNC) connect(window.JCA_SYNC).then(() => { if (view.name === 'settings') render(); }); });
 addEventListener('jca-signed-out', () => { disconnect(); if (view.name === 'settings') render(); });
 if (window.JCA_SYNC) connect(window.JCA_SYNC);
+addEventListener('jca-voices', () => { if (view.name === 'settings') render(); });
 
 // PDF (alfabeto e kanji): compaiono quando i file vengono aggiunti nella cartella pdf/
 for (const [k, f] of Object.entries({ hira: 'pdf/hiragana.pdf', kata: 'pdf/katakana.pdf', kanji: 'pdf/kanji.pdf' })) {

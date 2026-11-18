@@ -3,7 +3,7 @@ import { ROWS, WORDS, KANJI, RO, romaji } from './data.js';
 import { S, device, saveDevice, setRows, setSetting, connected, resetAll } from './store.js';
 import { tpl, check } from './recog.js';
 import { Pad, fitPad } from './pad.js';
-import { speak, voiceName, stopSpeech } from './speech.js';
+import { speak, voiceName, voiceList, setVoice, stopSpeech } from './speech.js';
 import { t, lang } from './i18n.js';
 import { $, $$, esc, IC, toast, logo } from './ui.js';
 import { startExercise, renderExercise } from './exercise.js';
@@ -11,9 +11,21 @@ import { startExercise, renderExercise } from './exercise.js';
 export let view = { name: 'home' };
 let pad = null;
 export function go(name, args = {}) { stopSpeech(); if (pad) pad.stopAnim(); view = { name, ...args }; render(); window.scrollTo(0, 0); }
+// Header uguale in tutte le schermate: logo (torna alla Home) e rotellina delle impostazioni
+function header() {
+  const root = $('#app');
+  if (!$('#hdr')) root.innerHTML = '<header id="hdr"></header><main id="view"></main>';
+  const wide = view.name === 'ex' || view.name === 'sheet';
+  const h = $('#hdr');
+  h.className = 'home-head' + (wide ? '' : ' narrow');
+  h.innerHTML = `<button class="logo-btn" id="b-home" aria-label="Home">${logo(lang())}</button><button class="icon-btn plain" id="b-set" aria-label="${esc(t('settings'))}">${IC.gear}</button>`;
+  $('#b-home').onclick = () => { if (view.name !== 'home') go('home'); };
+  $('#b-set').onclick = () => { if (view.name !== 'settings') go('settings'); };
+  return $('#view');
+}
 export function render() {
-  const app = $('#app');
   document.documentElement.lang = lang();
+  const app = header();
   const R = { home, section, alpha, sheet, kanjiHome, kanjiList, soon, settings, ex: renderExercise }[view.name] || home;
   R(app);
 }
@@ -27,14 +39,12 @@ function home(app) {
   const L = lang();
   const tile = (id, jp, lbl) => `<button class="tile" id="${id}"><span class="jp">${jp}</span>${L === 'ja' ? '' : `<span class="lbl">${lbl}</span>`}</button>`;
   app.innerHTML = `<div class="narrow">
-    <div class="home-head">${logo(L)}<button class="icon-btn plain" id="b-set" aria-label="${esc(t('settings'))}">${IC.gear}</button></div>
     <div class="tiles">
       ${tile('h-hira', 'ひらがな', 'Hiragana')}${tile('h-kata', 'カタカナ', 'Katakana')}
       ${tile('h-kanji', '漢字', 'Kanji')}${tile('h-gram', '文法', 'Grammatica')}
     </div>
     <button class="tile wide" id="h-full"><span class="jp">総合日本語</span>${L === 'ja' ? '' : '<span class="lbl">Giapponese completo</span>'}</button>
   </div>`;
-  $('#b-set').onclick = () => go('settings');
   $('#h-hira').onclick = () => go('section', { script: 'hira' });
   $('#h-kata').onclick = () => go('section', { script: 'kata' });
   $('#h-kanji').onclick = () => go('kanjiHome');
@@ -182,7 +192,9 @@ function settings(app) {
     ${li(t('sPad'), t('sPadSub'), seg('pad', [['l', t('big')], ['m', t('mid')], ['s', t('small')]], device.padSize || 'l'))}
     ${li(t('sHints'), t('sHintsSub'), seg('hints', [['auto', t('hAuto')], ['always', t('hAlways')]], st.hints))}
     ${li(t('sPen'), t('sPenSub'), `<button class="switch" role="switch" id="s-pen" aria-checked="${device.pencilOnly}" aria-label="${esc(t('sPen'))}"></button>`)}
-    ${li(t('sVoice'), voiceName() ? voiceName() : t('noVoice'), seg('rate', [['slow', t('slow')], ['normal', t('normalV')]], st.rate) + `<button class="icon-btn" id="s-test" aria-label="${esc(t('play'))}">${IC.sound}</button>`)}
+    ${li(t('sVoice'), voiceName() ? '' : t('noVoice'), seg('rate', [['slow', t('slow')], ['normal', t('normalV')]], st.rate) + `<button class="icon-btn" id="s-test" aria-label="${esc(t('play'))}">${IC.sound}</button>`)}
+    ${voiceList().length ? `<div class="li"><div class="t"><b>${esc(t('sWhich'))}</b><div class="muted small">${esc(t('sWhichSub'))}</div></div>
+      <select class="sel" id="s-voice" aria-label="${esc(t('sWhich'))}">${voiceList().map(n => `<option ${n === voiceName() ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
     ${A ? li(t('sAccount'), A.email ? t('signedAs', A.email) : t('notSigned'), `<button class="btn" id="s-acc">${esc(A.email ? t('signOut') : t('signIn'))}</button>`) : ''}
     ${li(t('sReset'), t('sResetSub'), `<button class="btn" id="s-reset">${esc(view.confirm ? t('resetSure') : t('reset'))}</button>`)}
   </div>
@@ -198,6 +210,7 @@ function settings(app) {
   }));
   $('#s-pen').onclick = () => { device.pencilOnly = !device.pencilOnly; device.penSeen = true; saveDevice(); render(); };
   $('#s-test').onclick = () => speak('こんにちは');
+  const sv = $('#s-voice'); if (sv) sv.onchange = () => { setVoice(sv.value); speak('こんにちは'); };
   const ac = $('#s-acc'); if (ac) ac.onclick = () => (A.email ? A.signOut() : A.show());
   $('#s-reset').onclick = () => { if (!view.confirm) { view.confirm = true; render(); return; } resetAll(); toast(t('resetDone')); go('home'); };
 }
