@@ -34,3 +34,6 @@ quindi uno stato vecchio di un altro dispositivo non le sovrascrive mai.
 ## Crediti
 
 Tratti: [KanjiVG](https://kanjivg.tagaini.net) di Ulrich Apel, licenza CC BY-SA 3.0 (`app/data/strokes-*.json` ne derivano, stessa licenza).
+
+Voce: audio in `audio/` generato con [VOICEVOX](https://voicevox.hiroshiba.jp) — **VOICEVOX:No.7** (stile アナウンス), normale e lenta.
+Per rigenerarlo dopo aver cambiato parole o kanji: `app/tools/voce/gen.py` (scrive anche `app/src/voice-index.js`); i testi senza file usano la voce del sistema.

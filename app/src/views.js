@@ -196,7 +196,7 @@ function settings(app) {
     ${A ? li(t('sAccount'), A.email ? t('signedAs', A.email) : t('notSigned'), `<button class="btn" id="s-acc">${esc(A.email ? t('signOut') : t('signIn'))}</button>`) : ''}
     ${li(t('sReset'), t('sResetSub'), `<button class="btn" id="s-reset">${esc(view.confirm ? t('resetSure') : t('reset'))}</button>`)}
   </div>
-  <p class="muted small center" style="margin-top:14px">v__VER__</p></div>`;
+  <p class="muted small center" style="margin-top:14px">v__VER__ · VOICEVOX:No.7</p></div>`;
   wireBack(['home']);
   $$('[data-k]').forEach(b => (b.onclick = () => {
     const k = b.dataset.k, v = b.dataset.v;
