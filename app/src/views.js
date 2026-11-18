@@ -3,7 +3,7 @@ import { ROWS, WORDS, KANJI, RO, romaji } from './data.js';
 import { S, device, saveDevice, setRows, setSetting, connected, resetAll } from './store.js';
 import { tpl, check } from './recog.js';
 import { Pad, fitPad } from './pad.js';
-import { speak, voiceName, voiceList, setVoice, stopSpeech } from './speech.js';
+import { speak, stopSpeech } from './speech.js';
 import { t, lang } from './i18n.js';
 import { $, $$, esc, IC, toast, logo } from './ui.js';
 import { startExercise, renderExercise } from './exercise.js';
@@ -192,13 +192,11 @@ function settings(app) {
     ${li(t('sPad'), t('sPadSub'), seg('pad', [['l', t('big')], ['m', t('mid')], ['s', t('small')]], device.padSize || 'l'))}
     ${li(t('sHints'), t('sHintsSub'), seg('hints', [['auto', t('hAuto')], ['always', t('hAlways')]], st.hints))}
     ${li(t('sPen'), t('sPenSub'), `<button class="switch" role="switch" id="s-pen" aria-checked="${device.pencilOnly}" aria-label="${esc(t('sPen'))}"></button>`)}
-    ${li(t('sVoice'), voiceName() ? '' : t('noVoice'), seg('rate', [['slow', t('slow')], ['normal', t('normalV')]], st.rate) + `<button class="icon-btn" id="s-test" aria-label="${esc(t('play'))}">${IC.sound}</button>`)}
-    ${voiceList().length ? `<div class="li"><div class="t"><b>${esc(t('sWhich'))}</b><div class="muted small">${esc(t('sWhichSub'))}</div></div>
-      <select class="sel" id="s-voice" aria-label="${esc(t('sWhich'))}">${voiceList().map(n => `<option ${n === voiceName() ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
+    ${li(t('sVoice'), '', seg('rate', [['slow', t('slow')], ['normal', t('normalV')]], st.rate) + `<button class="icon-btn" id="s-test" aria-label="${esc(t('play'))}">${IC.sound}</button>`)}
     ${A ? li(t('sAccount'), A.email ? t('signedAs', A.email) : t('notSigned'), `<button class="btn" id="s-acc">${esc(A.email ? t('signOut') : t('signIn'))}</button>`) : ''}
     ${li(t('sReset'), t('sResetSub'), `<button class="btn" id="s-reset">${esc(view.confirm ? t('resetSure') : t('reset'))}</button>`)}
   </div>
-  <p class="muted small center" style="margin-top:14px">v__VER__</p></div>`;
+  <p class="muted small center" style="margin-top:14px">v__VER__ · VOICEVOX:No.7</p></div>`;
   wireBack(['home']);
   $$('[data-k]').forEach(b => (b.onclick = () => {
     const k = b.dataset.k, v = b.dataset.v;
@@ -210,7 +208,6 @@ function settings(app) {
   }));
   $('#s-pen').onclick = () => { device.pencilOnly = !device.pencilOnly; device.penSeen = true; saveDevice(); render(); };
   $('#s-test').onclick = () => speak('こんにちは');
-  const sv = $('#s-voice'); if (sv) sv.onchange = () => { setVoice(sv.value); speak('こんにちは'); };
   const ac = $('#s-acc'); if (ac) ac.onclick = () => (A.email ? A.signOut() : A.show());
   $('#s-reset').onclick = () => { if (!view.confirm) { view.confirm = true; render(); return; } resetAll(); toast(t('resetDone')); go('home'); };
 }
