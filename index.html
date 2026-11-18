@@ -113,6 +113,7 @@ svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-l
 .kc{border-radius:12px;background:var(--surface);border:1px solid var(--line);padding:6px 2px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60px}
 .kc .k{font-family:var(--f-kana);font-size:1.7rem;line-height:1.1}
 .kc .r{font-size:.7rem;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px}
+.kgrid .kc .r{font-size:.82rem;color:var(--ink);white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.15}
 .kc.empty{background:transparent;border-color:transparent}
 .arow:not(.on) .kc:not(.empty){opacity:.5}
 .credit{margin-top:22px}
@@ -149,6 +150,7 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
 .sheet-head{display:flex;gap:16px;align-items:center}
 .sheet-head .k{font-family:var(--f-kana);font-size:4.4rem;line-height:1;color:var(--accent)}
 .sheet-head .t{flex:1;min-width:0}.sheet-head .r{font-size:1.35rem;font-weight:650}
+.sheet-head .r.it{overflow-wrap:anywhere;margin-top:2px}
 .ex{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
 .ex .k{font-family:var(--f-kana);font-size:1.35rem;min-width:4.6em}.ex .t{flex:1;min-width:0}
 
@@ -222,7 +224,7 @@ if(cfg&&cfg.apiKey){
   }catch(e){console.warn('Firebase non raggiungibile: si lavora sul dispositivo',e);}
 }
 </script>
-<script src="app.js?v=c1f7f86a"></script>
+<script src="app.js?v=a8c51702"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
 </html>

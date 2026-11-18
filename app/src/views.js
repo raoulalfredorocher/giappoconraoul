@@ -132,7 +132,7 @@ function sheet(app) {
   <div class="quiz">
     <div class="side"><section class="prompt">
       <div class="sheet-head"><span class="k">${esc(ch)}</span><div class="t"><div class="r">${esc(kj ? kj.yomi + ' · ' + kj.ro : romaji(ch))}</div>
-        <div class="muted small">${esc(t('strokes', n))}${kj ? ' · ' + esc(kj.it) : ''}</div></div>
+        ${kj ? `<div class="r it">${esc(kj.it)}</div>` : ''}<div class="muted small">${esc(t('strokes', n))}</div></div>
         <button class="icon-btn" id="k-say" aria-label="${esc(t('play'))}">${IC.sound}</button></div>
       ${words.map(w => `<div class="ex"><span class="k">${esc(w.k)}</span><span class="t">${esc(w.it)} <span class="muted small">${esc(w.ro)}</span></span><button class="icon-btn plain" data-say="${esc(w.k)}" aria-label="${esc(t('play'))}">${IC.sound}</button></div>`).join('')}
     </section></div>
