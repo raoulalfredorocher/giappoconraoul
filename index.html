@@ -159,24 +159,32 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
 @media (max-width:600px){.hide-phone{display:none}.prompt{padding:14px}}
 /* allenamento kana: tutto lo schermo, foglio grande */
 .quiz.train{display:flex;flex-direction:column;gap:10px}
-.quiz.train>.side{flex:1 1 auto;display:flex;flex-direction:column}
-.quiz.train.measuring>.side{flex:none}.quiz.train.measuring>.fbslot{display:none}
-.quiz.train>.padwrap{flex:none}
-.quiz.train>.side>.prompt{flex:1 1 auto;justify-content:center}
-.prompt.tp{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px 18px;padding:12px 16px}
-.tp-main{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
-.quiz.train .prompt .big{font-size:clamp(2.6rem,min(13vw,8vh),5rem)}
-.prompt.tp .ans{flex:1 1 160px;width:auto;min-width:0;max-width:340px}
-.prompt.tp .reveal{flex-basis:100%;justify-content:center}
+.quiz.train>.side,.quiz.train>.fbslot{flex:none}
+/* il messaggio dopo Controlla resta nella misura */.quiz.train.measuring>.padwrap{flex:none}.quiz.train.measuring>.padwrap>canvas.pad{margin:0}
+.quiz.train>.padwrap{flex:1 1 auto;min-height:0;gap:10px}
+.quiz.train>.padwrap>canvas.pad{margin:auto 0}
+.prompt.tp{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;padding:12px 14px 12px 18px;text-align:left}
+.tp-main{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;flex:1}
+.quiz.train .prompt .big{font-size:clamp(2.4rem,min(11vw,7vh),4rem);line-height:1}
+.quiz.train .prompt .ask{font-size:.85rem}
+.prompt.tp .ans{flex:1 1 140px;width:auto;min-width:0}
+.prompt.tp .reveal{flex-basis:100%}
 .sndbtn{width:52px;height:52px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent)}
-.sndbtn.lg{width:58px;height:58px;background:var(--accent);color:var(--accent-ink)}
+.sndbtn.lg{background:var(--accent);color:var(--accent-ink)}
 .sndbtn svg{width:26px;height:26px}
 .sndbtn:active{transform:scale(.95)}
-.quiz.train .tools{flex-wrap:nowrap}
-.quiz.train .fb{padding:8px 12px;font-size:.9rem;line-height:1.3}
+.quiz.train .tools{flex-wrap:nowrap;flex:none}
 .quiz.train .tools .btn.grow{max-width:none}
-@media (min-width:860px) and (orientation:landscape){.quiz.train:not(.nopad){display:grid;grid-template-rows:minmax(0,1fr) auto;align-items:stretch}
-  .quiz.train:not(.nopad)>.side>.prompt{flex-direction:column;gap:18px}.quiz.train .prompt.tp .ans{flex:none;width:100%}.quiz.train .tools .btn.grow{max-width:320px}}
+.quiz.train .fb{padding:8px 12px;font-size:.9rem;line-height:1.3}
+@media (min-width:860px) and (orientation:landscape){
+  .quiz.train:not(.nopad){display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;gap:12px 20px}
+  .quiz.train>.side{grid-column:1;grid-row:1}.quiz.train>.fbslot{grid-column:1;grid-row:2}
+  .quiz.train>.padwrap{display:contents}
+  .quiz.train>.padwrap>canvas.pad{grid-column:2;grid-row:1/5;align-self:center;justify-self:center;margin:0}
+  .quiz.train>.padwrap>.tools{grid-column:1;grid-row:4;flex-wrap:wrap;max-width:none!important}
+  .quiz.train .tools .btn.grow{flex-basis:100%;min-height:54px;font-size:1.05rem}
+  .quiz.train .tools>.icon-btn,.quiz.train .tools>.btn:not(.grow){flex:1}
+}
 
 /* allenamento kanji: tutto lo schermo, linguette sempre intere */
 .exbar.kj{grid-template-columns:44px minmax(0,1fr) auto;gap:8px;margin-bottom:12px}
@@ -215,6 +223,16 @@ canvas.pad{display:block;background:var(--surface);border:1px solid var(--line);
   .kq.haspad{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.5fr);gap:16px;align-items:stretch}
   .kq.haspad .kmain{grid-column:2;grid-row:1}
   .kq.nopad{max-width:640px;margin:0 auto}
+}
+@media (min-width:860px) and (orientation:landscape){
+  .kq.haspad{grid-template-columns:minmax(280px,340px) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:12px 20px}
+  .kq.haspad .kmain{display:contents}
+  .kq.haspad .kside{grid-column:1;grid-row:1}
+  .kq.haspad .kslot{grid-column:2;grid-row:1/3;min-height:0}
+  .kq.haspad .kbar{grid-column:1;grid-row:2;flex-wrap:wrap}
+  .kq.haspad .kbar .btn.grow{flex-basis:100%}
+  .kq.haspad .kbar>.icon-btn,.kq.haspad .kbar>.btn:not(.grow){flex:1}
+  .kq.haspad .khead{flex-wrap:wrap}
 }
 @media (min-width:700px) and (orientation:portrait){.kq.nopad{max-width:640px;margin:0 auto;width:100%}}
 
@@ -298,7 +316,7 @@ if(cfg&&cfg.apiKey){
   }catch(e){console.warn('Firebase non raggiungibile: si lavora sul dispositivo',e);}
 }
 </script>
-<script src="app.js?v=5ce8a4a3"></script>
+<script src="app.js?v=3a85be35"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
 </html>
