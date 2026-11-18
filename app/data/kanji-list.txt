@@ -1,3 +1,4 @@
+# Numeri|数字
 一|いち|uno
 二|に|due
 三|さん|tre
@@ -11,7 +12,13 @@
 百|ひゃく|cento
 千|せん|mille
 万|まん|diecimila
+億|おく|cento milioni
 円|えん|yen; cerchio
+番|ばん|numero (d'ordine), turno
+数|かず|numero, quantità
+回|かい|volta (contatore)
+個|こ|pezzo (contatore)
+# Giorni e mesi|曜日と月
 日|にち|giorno; sole
 月|つき|luna; mese
 火|ひ|fuoco
@@ -19,79 +26,357 @@
 木|き|albero
 金|きん|oro; soldi
 土|つち|terra, suolo
+曜|よう|giorno della settimana
+週|しゅう|settimana
+# Tempo|時間
 年|とし|anno
+時|じ|ora
+分|ふん|minuto
+秒|びょう|secondo
+半|はん|metà, mezzo
+今|いま|adesso
+朝|あさ|mattina
+昼|ひる|mezzogiorno
+夕|ゆう|tardo pomeriggio, sera
+晩|ばん|sera
+夜|よる|notte
+午|ご|mezzogiorno (午前, 午後)
+前|まえ|davanti, prima
+後|あと|dopo
+毎|まい|ogni
+間|あいだ|intervallo, fra
+先|さき|prima, davanti
+昨|さく|precedente (昨日 ieri)
+去|さる|andarsene; passato (去年)
+早|はやい|presto
+遅|おそい|tardi, in ritardo
+# Stagioni e meteo|季節と天気
+春|はる|primavera
+夏|なつ|estate
+秋|あき|autunno
+冬|ふゆ|inverno
+天|てん|cielo
+気|き|spirito, energia; aria
+雨|あめ|pioggia
+雪|ゆき|neve
+風|かぜ|vento
+雲|くも|nuvola
+晴|はれ|sereno, bel tempo
+暑|あつい|caldo (clima)
+寒|さむい|freddo (clima)
+温|あたたかい|tiepido, caldo
+# Colori|色
+色|いろ|colore
+白|しろ|bianco
+黒|くろ|nero
+赤|あか|rosso
+青|あお|blu
+黄|き|giallo (黄色)
+緑|みどり|verde
+銀|ぎん|argento
+紫|むらさき|viola
+# Animali|動物
+犬|いぬ|cane
+猫|ねこ|gatto
+魚|さかな|pesce
+鳥|とり|uccello
+馬|うま|cavallo
+牛|うし|mucca, bue
+虫|むし|insetto
+貝|かい|conchiglia
+羊|ひつじ|pecora
+豚|ぶた|maiale
+象|ぞう|elefante
+熊|くま|orso
+竜|りゅう|drago
+羽|はね|piuma, ala
+# Natura|自然
+山|やま|montagna
+川|かわ|fiume
+田|た|risaia
+空|そら|cielo
+花|はな|fiore
+石|いし|pietra
+林|はやし|bosco
+森|もり|foresta
+海|うみ|mare
+池|いけ|stagno
+湖|みずうみ|lago
+草|くさ|erba
+竹|たけ|bambù
+岩|いわ|roccia
+島|しま|isola
+野|の|campo, prateria
+原|はら|pianura, prato
+星|ほし|stella
+光|ひかり|luce
+地|ち|terra, suolo
+葉|は|foglia
+谷|たに|valle
+波|なみ|onda
+# Corpo|体
+体|からだ|corpo
+口|くち|bocca
+目|め|occhio
+耳|みみ|orecchio
+手|て|mano
+足|あし|piede, gamba
+頭|あたま|testa
+顔|かお|viso
+首|くび|collo
+鼻|はな|naso
+歯|は|dente
+毛|け|pelo, capelli
+指|ゆび|dito
+背|せ|schiena; statura
+声|こえ|voce
+血|ち|sangue
+身|み|corpo, sé stesso
+力|ちから|forza
+心|こころ|cuore
+# Persone e famiglia|人と家族
 人|ひと|persona
 子|こ|bambino
 女|おんな|donna
 男|おとこ|uomo
 父|ちち|padre
 母|はは|madre
+兄|あに|fratello maggiore
+弟|おとうと|fratello minore
+姉|あね|sorella maggiore
+妹|いもうと|sorella minore
+親|おや|genitore
+族|ぞく|famiglia, clan
+夫|おっと|marito
+妻|つま|moglie
 友|とも|amico
-山|やま|montagna
-川|かわ|fiume
-田|た|risaia
-空|そら|cielo
-雨|あめ|pioggia
-花|はな|fiore
-石|いし|pietra
+私|わたし|io
+自|じ|sé stesso
+彼|かれ|lui
+者|もの|persona (che fa qualcosa)
+王|おう|re
+客|きゃく|ospite, cliente
+員|いん|membro, addetto
+名|な|nome
+様|さま|signore, signora (titolo)
+# Posizione e direzione|位置と方向
 上|うえ|sopra
 下|した|sotto
 中|なか|dentro; centro
-大|だい|grande
-小|しょう|piccolo
 右|みぎ|destra
 左|ひだり|sinistra
-口|くち|bocca
-目|め|occhio
-耳|みみ|orecchio
-手|て|mano
-足|あし|piede, gamba
-力|ちから|forza
-心|こころ|cuore
-本|ほん|libro
+外|そと|fuori
+内|うち|dentro, interno
+東|ひがし|est
+西|にし|ovest
+南|みなみ|sud
+北|きた|nord
+方|ほう|direzione, lato
+向|むく|rivolgersi verso
+横|よこ|lato, accanto
+側|がわ|lato, parte
+近|ちかい|vicino
+遠|とおい|lontano
+# Luoghi e città|場所と町
+国|くに|paese, nazione
+町|まち|città, quartiere
+村|むら|villaggio
+市|し|città (comune)
+県|けん|prefettura
+都|と|capitale, metropoli
+京|きょう|capitale (Tokyo, Kyoto)
+道|みち|strada
+橋|はし|ponte
+場|ば|luogo
+所|ところ|posto
+店|みせ|negozio
+駅|えき|stazione
+家|いえ|casa
+室|しつ|stanza
+屋|や|negozio; tetto
+館|かん|edificio (grande)
+院|いん|istituto (病院 ospedale)
+寺|てら|tempio buddista
+社|しゃ|azienda; santuario
+港|みなと|porto
+園|えん|giardino, parco
+庭|にわ|giardino di casa
+門|もん|cancello, portone
+# Scuola e studio|学校と勉強
 学|がく|studio
+校|こう|scuola
 生|せい|vita
-先|さき|prima, davanti
-名|な|nome
-前|まえ|davanti, prima
-後|あと|dopo
-時|じ|ora
-分|ふん|minuto
-半|はん|metà, mezzo
-今|いま|adesso
-何|なに|cosa
+本|ほん|libro
+字|じ|carattere (scrittura)
+文|ぶん|frase, testo
+語|ご|lingua, parola
+教|おしえる|insegnare
+習|ならう|imparare
+勉|べん|sforzo (勉強 studio)
+試|ためす|provare, mettere alla prova
+験|けん|verifica (試験 esame)
+問|もん|domanda
+題|だい|tema, titolo
+答|こたえ|risposta
+漢|かん|Cina antica (漢字 kanji)
+英|えい|inglese; eccellente
+科|か|materia, sezione
+紙|かみ|carta
+宿|やど|alloggio (宿題 compiti)
+# Cibo e bevande|食べ物と飲み物
+米|こめ|riso
+飯|めし|riso cotto, pasto
+肉|にく|carne
+茶|ちゃ|tè; marrone
+酒|さけ|sake, alcol
+菜|さい|verdura (野菜)
+果|か|frutto (果物)
+卵|たまご|uovo
+塩|しお|sale
+味|あじ|sapore
+料|りょう|tariffa; ingrediente
+理|り|ragione (料理 cucina)
+麦|むぎ|grano, orzo
+豆|まめ|fagiolo, legume
+油|あぶら|olio
+乳|ちち|latte (牛乳)
+糖|とう|zucchero
+# Verbi di ogni giorno|毎日の動詞
 見|みる|vedere
-行|いく|andare
-来|くる|venire
-食|たべる|mangiare
-飲|のむ|bere
 言|いう|dire
 話|はなす|parlare
 読|よむ|leggere
 書|かく|scrivere
 聞|きく|ascoltare
+食|たべる|mangiare
+飲|のむ|bere
 休|やすむ|riposare
+寝|ねる|dormire
+起|おきる|alzarsi, svegliarsi
+着|きる|indossare
+洗|あらう|lavare
+買|かう|comprare
+売|うる|vendere
+使|つかう|usare
+作|つくる|fare, creare
+持|もつ|tenere, avere
+待|まつ|aspettare
+会|あう|incontrare
+知|しる|sapere, conoscere
+思|おもう|pensare
+考|かんがえる|riflettere
+働|はたらく|lavorare
+歌|うたう|cantare
+遊|あそぶ|giocare
+貸|かす|prestare
+借|かりる|prendere in prestito
+呼|よぶ|chiamare
+取|とる|prendere
+切|きる|tagliare
+死|しぬ|morire
+# Verbi di movimento|動きの動詞
+行|いく|andare
+来|くる|venire
+入|はいる|entrare
+出|でる|uscire
+帰|かえる|tornare (a casa)
 立|たつ|stare in piedi
-白|しろ|bianco
-赤|あか|rosso
-青|あお|blu
-犬|いぬ|cane
-魚|さかな|pesce
+歩|あるく|camminare
+走|はしる|correre
+乗|のる|salire (su un mezzo)
+降|おりる|scendere
+泳|およぐ|nuotare
+動|うごく|muoversi
+止|とまる|fermarsi
+送|おくる|inviare
+返|かえす|restituire
+引|ひく|tirare
+開|あける|aprire
+閉|しめる|chiudere
+始|はじめる|cominciare
+終|おわる|finire
+住|すむ|abitare
+# Aggettivi|形容詞
+大|だい|grande
+小|しょう|piccolo
+高|たかい|alto; caro
+低|ひくい|basso
+安|やすい|economico
+新|あたらしい|nuovo
+古|ふるい|vecchio
+長|ながい|lungo
+短|みじかい|corto
+多|おおい|molti
+少|すくない|pochi
+明|あかるい|luminoso
+暗|くらい|buio
+強|つよい|forte
+弱|よわい|debole
+広|ひろい|ampio
+太|ふとい|grosso, spesso
+細|ほそい|sottile
+重|おもい|pesante
+軽|かるい|leggero
+楽|たのしい|divertente
+悪|わるい|cattivo
+良|よい|buono
+美|うつくしい|bello
+好|すき|piacere (好き)
+正|ただしい|giusto, corretto
+若|わかい|giovane
+速|はやい|veloce
+同|おなじ|uguale
+深|ふかい|profondo
+# Trasporti e viaggi|乗り物と旅行
 車|くるま|automobile
-国|くに|paese, nazione
-外|そと|fuori
-東|ひがし|est
-西|にし|ovest
-南|みなみ|sud
-北|きた|nord
-春|はる|primavera
-夏|なつ|estate
-秋|あき|autunno
-冬|ふゆ|inverno
-朝|あさ|mattina
-夜|よる|notte
-店|みせ|negozio
-駅|えき|stazione
-家|いえ|casa
-米|こめ|riso
-雪|ゆき|neve
+電|でん|elettricità
+鉄|てつ|ferro
+船|ふね|nave
+機|き|macchina (飛行機 aereo)
+飛|とぶ|volare
+旅|たび|viaggio
+転|てん|girare (自転車 bicicletta)
+運|うん|fortuna; trasportare
+便|びん|volo, posta
+# Casa e oggetti|家と物
+物|もの|cosa, oggetto
+品|しな|articolo, merce
+服|ふく|vestito
+戸|と|porta
+窓|まど|finestra
+机|つくえ|scrivania
+箱|はこ|scatola
+皿|さら|piatto
+糸|いと|filo
+薬|くすり|medicina
+写|うつす|copiare, fotografare
+真|しん|vero (写真 foto)
+画|が|immagine, disegno
+音|おと|suono
+# Lavoro e società|仕事と社会
+仕|し|servire (仕事 lavoro)
+事|こと|cosa, faccenda
+医|い|medicina (医者 medico)
+病|びょう|malattia (病気)
+公|こう|pubblico
+世|よ|mondo, epoca
+界|かい|mondo, ambito
+用|よう|uso, impegno
+代|だい|generazione; tariffa
+特|とく|speciale
+別|べつ|diverso, separato
+有|ゆう|esistere, possedere
+無|む|nulla, senza
+不|ふ|non (negazione)
+計|けい|misura, piano
+意|い|mente, significato
+業|ぎょう|affari, industria
+# Parole utili|便利な言葉
+何|なに|cosa
+全|ぜん|tutto
+部|ぶ|parte, sezione
+次|つぎ|prossimo, successivo
+初|はじめ|inizio, prima volta
+最|さい|il più (最初, 最後)
+他|ほか|altro
+皆|みな|tutti

@@ -120,6 +120,16 @@ svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-l
 .arow:not(.on) .kc:not(.empty){opacity:.5}
 .credit{margin-top:22px}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px}
+.kcats{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.kcat{border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.kcat summary{display:flex;align-items:center;gap:10px;padding:16px 18px;cursor:pointer;list-style:none;user-select:none;-webkit-user-select:none}
+.kcat summary::-webkit-details-marker{display:none}
+.kcat .nm{font-size:1.08rem;font-weight:600}
+.kcat .jp{font-family:var(--f-kana);color:var(--muted);font-size:.95rem}
+.kcat .n{margin-left:auto;color:var(--muted);font-size:.88rem}
+.kcat summary svg{width:20px;height:20px;color:var(--muted);transition:transform .15s;flex:none}
+.kcat[open] summary svg{transform:rotate(90deg)}
+.kcat .kgrid{padding:0 12px 14px}
 
 /* esercizi */
 .quiz{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);grid-template-areas:"side" "fb" "pad"}
@@ -228,7 +238,7 @@ if(cfg&&cfg.apiKey){
   }catch(e){console.warn('Firebase non raggiungibile: si lavora sul dispositivo',e);}
 }
 </script>
-<script src="app.js?v=6f9e92ab"></script>
+<script src="app.js?v=b856d9f3"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
 </html>

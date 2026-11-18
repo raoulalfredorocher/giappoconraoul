@@ -1,5 +1,5 @@
 // Schermate: Home, sezioni, Alfabeto, scheda del kana/kanji, Kanji, Impostazioni, sezioni in arrivo.
-import { ROWS, WORDS, KANJI, RO, romaji } from './data.js';
+import { ROWS, WORDS, KANJI, KCATS, RO, romaji } from './data.js';
 import { S, device, saveDevice, setRows, setSetting, connected, resetAll, saveNow } from './store.js';
 import { tpl, check } from './recog.js';
 import { Pad, fitPad } from './pad.js';
@@ -178,12 +178,24 @@ function kanjiHome(app) {
   $('#j-train').onclick = () => startExercise('kanji', 'kanji', go);
   $('#j-links').onclick = () => go('soon', { what: 'links' });
 }
+// categorie comprimibili; quelle aperte restano aperte su questo dispositivo
+const KOPEN = 'jca-kcat-open';
 function kanjiList(app) {
+  let open = [];
+  try { open = JSON.parse(localStorage.getItem(KOPEN) || '[]'); } catch (e) {}
+  const ja = lang() === 'ja';
+  const cat = c => `<details class="kcat" data-cat="${esc(c.it)}" ${open.includes(c.it) ? 'open' : ''}>
+      <summary><span class="nm">${esc(ja ? c.ja : c.it)}</span>${ja ? '' : `<span class="jp">${esc(c.ja)}</span>`}<span class="n">${c.items.length}</span>${IC.chev}</summary>
+      <div class="kgrid">${c.items.map(k => `<button class="kc" data-ch="${k.k}"><span class="k">${k.k}</span><span class="r">${esc(k.it.split(/[;,(]/)[0].trim())}</span></button>`).join('')}</div></details>`;
   app.innerHTML = `<div class="narrow">${top(esc(t('kanjiPdf')), null, pdfAvail.kanji ? `<a class="btn" href="${PDF.kanji}" target="_blank" rel="noopener">${IC.doc}PDF</a>` : '')}
-    ${pdfAvail.kanji ? '' : `<p class="muted small">${esc(t('kanjiPdfNone'))}</p>`}
-    <div class="kgrid">${KANJI.map(k => `<button class="kc" data-ch="${k.k}"><span class="k">${k.k}</span><span class="r">${esc(k.it.split(/[;,]/)[0])}</span></button>`).join('')}</div></div>`;
+    <div class="kcats">${KCATS.filter(c => c.items.length).map(cat).join('')}</div>
+    <p class="muted small credit">KanjiVG © Ulrich Apel, CC BY-SA 3.0</p></div>`;
   wireBack(['kanjiHome']);
-  $$('[data-ch]').forEach(b => (b.onclick = () => go('sheet', { script: 'kanji', ch: b.dataset.ch, from: 'kanjiList' })));
+  const all = () => [...document.querySelectorAll('details.kcat')];
+  all().forEach(d => (d.ontoggle = () => {
+    try { localStorage.setItem(KOPEN, JSON.stringify(all().filter(x => x.open).map(x => x.dataset.cat))); } catch (e) {}
+  }));
+  document.querySelectorAll('[data-ch]').forEach(b => (b.onclick = () => go('sheet', { script: 'kanji', ch: b.dataset.ch, from: 'kanjiList' })));
 }
 
 // ---- in arrivo ----
