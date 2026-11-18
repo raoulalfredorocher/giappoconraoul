@@ -1,5 +1,5 @@
 // Offline: la pagina e app.js si prendono dalla rete (aggiornamenti subito), dalla cache se manca la rete.
-const V='jca-b1574d2d';
+const V='jca-a894995a';
 const SHELL=['./','index.html','app.js','config.js','manifest.webmanifest','icons/icon-192.png'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).catch(()=>{}));});
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==V)await caches.delete(k);await self.clients.claim();})()));
