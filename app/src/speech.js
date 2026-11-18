@@ -38,6 +38,7 @@ let token = 0;
 export function speak(text, times = 1) {
   const my = ++token;
   sysCancel();
+  try { if (navigator.audioSession && !micMode && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {} // suona anche col silenzioso; mai dentro Parla
   const src = audioFor(text);
   if (!src) return sysSpeak(text, times, my);
   const a = player();
