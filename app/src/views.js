@@ -7,18 +7,19 @@ import { speak, stopSpeech } from './speech.js';
 import { t, lang } from './i18n.js';
 import { $, $$, esc, IC, toast, logo } from './ui.js';
 import { startExercise, renderExercise } from './exercise.js';
+import { startTalk, renderTalk, leaveTalk, tt } from './talk.js';
 
 export let view = { name: 'home' };
 let pad = null;
 export function go(name, args = {}) {
   // Impostazioni: ricorda da dove arrivo, Indietro ci riporta lì
   if (name === 'settings' && view.name !== 'settings') args = { ...args, ret: { ...view } };
-  stopSpeech(); if (pad) pad.stopAnim(); view = { name, ...args }; render(); window.scrollTo(0, 0); }
+  stopSpeech(); leaveTalk(); if (pad) pad.stopAnim(); view = { name, ...args }; render(); window.scrollTo(0, 0); }
 // Header uguale in tutte le schermate: logo (torna alla Home) e rotellina delle impostazioni
 function header() {
   const root = $('#app');
   if (!$('#hdr')) root.innerHTML = '<header id="hdr"></header><main id="view"></main>';
-  const wide = view.name === 'ex' || view.name === 'sheet';
+  const wide = view.name === 'ex' || view.name === 'sheet' || view.name === 'talk';
   const h = $('#hdr');
   h.className = 'home-head' + (wide ? '' : ' narrow');
   h.innerHTML = `<button class="logo-btn" id="b-home" aria-label="Home">${logo(lang())}</button><button class="icon-btn plain" id="b-set" aria-label="${esc(t('settings'))}">${IC.gear}</button>`;
@@ -29,7 +30,7 @@ function header() {
 export function render() {
   document.documentElement.lang = lang();
   const app = header();
-  const R = { home, section, alpha, sheet, kanjiHome, kanjiList, soon, settings, ex: renderExercise }[view.name] || home;
+  const R = { home, section, alpha, sheet, kanjiHome, kanjiList, soon, settings, ex: renderExercise, talk: a => renderTalk(a, () => view.name) }[view.name] || home;
   R(app);
 }
 const PDF = { hira: 'pdf/hiragana.pdf', kata: 'pdf/katakana.pdf', kanji: 'pdf/kanji.pdf' };
@@ -66,11 +67,13 @@ function section(app) {
       ${row('s-alpha', a, t('alphabet'), t('rowsChosen', nRows))}
       ${row('s-train', '書', t('training'), `${t('letters')} · ${t('audio')}`)}
       ${row('s-vocab', '語', t('vocab'), `${t('writing')} · ${t('audio')}`)}
+      ${row('s-talk', '話', tt('talk'), tt('talkSub'))}
     </div></div>`;
   wireBack(['home']);
   $('#s-alpha').onclick = () => go('alpha', { script: sc });
   $('#s-train').onclick = () => startExercise(sc, 'train', go);
   $('#s-vocab').onclick = () => startExercise(sc, 'vocab', go);
+  $('#s-talk').onclick = () => startTalk(sc, go);
 }
 
 function alpha(app) {
@@ -171,11 +174,13 @@ function kanjiHome(app) {
     <div class="choices">
       ${row('j-list', '字', t('kanjiPdf'), pdfAvail.kanji ? 'PDF' : `${KANJI.length}`)}
       ${row('j-train', '書', t('training'), `${t('kWrite')} · ${t('kSymbol')} · ${t('kAudio')}`)}
+      ${row('j-talk', '話', tt('talk'), tt('talkSub'))}
       ${row('j-links', '繋', t('kanjiLinks'), t('kanjiLinksSub'))}
     </div></div>`;
   wireBack(['home']);
   $('#j-list').onclick = () => go('kanjiList');
   $('#j-train').onclick = () => startExercise('kanji', 'kanji', go);
+  $('#j-talk').onclick = () => startTalk('kanji', go);
   $('#j-links').onclick = () => go('soon', { what: 'links' });
 }
 // categorie comprimibili; quelle aperte restano aperte su questo dispositivo
