@@ -1,0 +1,97 @@
+一|いち|uno
+二|に|due
+三|さん|tre
+四|よん|quattro
+五|ご|cinque
+六|ろく|sei
+七|なな|sette
+八|はち|otto
+九|きゅう|nove
+十|じゅう|dieci
+百|ひゃく|cento
+千|せん|mille
+万|まん|diecimila
+円|えん|yen; cerchio
+日|にち|giorno; sole
+月|つき|luna; mese
+火|ひ|fuoco
+水|みず|acqua
+木|き|albero
+金|きん|oro; soldi
+土|つち|terra, suolo
+年|とし|anno
+人|ひと|persona
+子|こ|bambino
+女|おんな|donna
+男|おとこ|uomo
+父|ちち|padre
+母|はは|madre
+友|とも|amico
+山|やま|montagna
+川|かわ|fiume
+田|た|risaia
+空|そら|cielo
+雨|あめ|pioggia
+花|はな|fiore
+石|いし|pietra
+上|うえ|sopra
+下|した|sotto
+中|なか|dentro; centro
+大|だい|grande
+小|しょう|piccolo
+右|みぎ|destra
+左|ひだり|sinistra
+口|くち|bocca
+目|め|occhio
+耳|みみ|orecchio
+手|て|mano
+足|あし|piede, gamba
+力|ちから|forza
+心|こころ|cuore
+本|ほん|libro
+学|がく|studio
+生|せい|vita
+先|さき|prima, davanti
+名|な|nome
+前|まえ|davanti, prima
+後|あと|dopo
+時|じ|ora
+分|ふん|minuto
+半|はん|metà, mezzo
+今|いま|adesso
+何|なに|cosa
+見|みる|vedere
+行|いく|andare
+来|くる|venire
+食|たべる|mangiare
+飲|のむ|bere
+言|いう|dire
+話|はなす|parlare
+読|よむ|leggere
+書|かく|scrivere
+聞|きく|ascoltare
+休|やすむ|riposare
+立|たつ|stare in piedi
+白|しろ|bianco
+赤|あか|rosso
+青|あお|blu
+犬|いぬ|cane
+魚|さかな|pesce
+車|くるま|automobile
+国|くに|paese, nazione
+外|そと|fuori
+東|ひがし|est
+西|にし|ovest
+南|みなみ|sud
+北|きた|nord
+春|はる|primavera
+夏|なつ|estate
+秋|あき|autunno
+冬|ふゆ|inverno
+朝|あさ|mattina
+夜|よる|notte
+店|みせ|negozio
+駅|えき|stazione
+家|いえ|casa
+米|こめ|riso
+雪|ゆき|neve
